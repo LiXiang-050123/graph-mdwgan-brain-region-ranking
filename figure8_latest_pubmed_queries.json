@@ -1,0 +1,152 @@
+{
+  "search_date": "2026-07-22",
+  "database": "PubMed",
+  "methamphetamine_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract])",
+  "methamphetamine_pubmed_count": 18910,
+  "region_queries": [
+    {
+      "brain_region": "ACC",
+      "region_name": "anterior cingulate cortex",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (\"anterior cingulate cortex\"[Title/Abstract] OR \"anterior cingulate\"[Title/Abstract] OR \"cingulate cortex\"[Title/Abstract])",
+      "pubmed_count": 103,
+      "region_background_count": 29112,
+      "retrieved_pmids": 103
+    },
+    {
+      "brain_region": "NAco",
+      "region_name": "nucleus accumbens core",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (\"nucleus accumbens core\"[Title/Abstract] OR \"accumbens core\"[Title/Abstract] OR \"NAc core\"[Title/Abstract] OR \"core of the nucleus accumbens\"[Title/Abstract])",
+      "pubmed_count": 82,
+      "region_background_count": 1910,
+      "retrieved_pmids": 82
+    },
+    {
+      "brain_region": "CLA",
+      "region_name": "claustrum",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (claustrum[Title/Abstract] OR claustral[Title/Abstract])",
+      "pubmed_count": 9,
+      "region_background_count": 1551,
+      "retrieved_pmids": 9
+    },
+    {
+      "brain_region": "VTA",
+      "region_name": "ventral tegmental area",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (\"ventral tegmental area\"[Title/Abstract] OR \"ventral tegmentum\"[Title/Abstract] OR VTA[Title/Abstract])",
+      "pubmed_count": 209,
+      "region_background_count": 11555,
+      "retrieved_pmids": 209
+    },
+    {
+      "brain_region": "DMS",
+      "region_name": "dorsomedial striatum",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (\"dorsomedial striatum\"[Title/Abstract] OR \"dorso-medial striatum\"[Title/Abstract] OR \"medial dorsal striatum\"[Title/Abstract])",
+      "pubmed_count": 20,
+      "region_background_count": 693,
+      "retrieved_pmids": 20
+    },
+    {
+      "brain_region": "CeA",
+      "region_name": "central amygdala",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (\"central amygdala\"[Title/Abstract] OR \"central nucleus of the amygdala\"[Title/Abstract] OR \"central amygdaloid nucleus\"[Title/Abstract] OR CeA[Title/Abstract])",
+      "pubmed_count": 27,
+      "region_background_count": 34039,
+      "retrieved_pmids": 27
+    },
+    {
+      "brain_region": "BLA",
+      "region_name": "basolateral amygdala",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (\"basolateral amygdala\"[Title/Abstract] OR \"basolateral amygdaloid nucleus\"[Title/Abstract] OR BLA[Title/Abstract])",
+      "pubmed_count": 46,
+      "region_background_count": 21072,
+      "retrieved_pmids": 46
+    },
+    {
+      "brain_region": "PL",
+      "region_name": "prelimbic cortex",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (\"prelimbic cortex\"[Title/Abstract] OR \"prelimbic medial prefrontal cortex\"[Title/Abstract] OR \"prelimbic area\"[Title/Abstract])",
+      "pubmed_count": 28,
+      "region_background_count": 1497,
+      "retrieved_pmids": 28
+    },
+    {
+      "brain_region": "VP",
+      "region_name": "ventral pallidum",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (\"ventral pallidum\"[Title/Abstract] OR \"ventral pallidal\"[Title/Abstract])",
+      "pubmed_count": 10,
+      "region_background_count": 1308,
+      "retrieved_pmids": 10
+    },
+    {
+      "brain_region": "OFC",
+      "region_name": "orbitofrontal cortex",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (\"orbitofrontal cortex\"[Title/Abstract] OR \"orbito-frontal cortex\"[Title/Abstract] OR \"orbital frontal cortex\"[Title/Abstract])",
+      "pubmed_count": 59,
+      "region_background_count": 9215,
+      "retrieved_pmids": 59
+    },
+    {
+      "brain_region": "NAsh",
+      "region_name": "nucleus accumbens shell",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (\"nucleus accumbens shell\"[Title/Abstract] OR \"accumbens shell\"[Title/Abstract] OR \"NAc shell\"[Title/Abstract] OR \"shell of the nucleus accumbens\"[Title/Abstract])",
+      "pubmed_count": 62,
+      "region_background_count": 2418,
+      "retrieved_pmids": 62
+    },
+    {
+      "brain_region": "GP",
+      "region_name": "globus pallidus",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (\"globus pallidus\"[Title/Abstract] OR \"globus pallidal\"[Title/Abstract] OR \"pallidal\"[Title/Abstract])",
+      "pubmed_count": 49,
+      "region_background_count": 12030,
+      "retrieved_pmids": 49
+    },
+    {
+      "brain_region": "RSC",
+      "region_name": "retrosplenial cortex",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (\"retrosplenial cortex\"[Title/Abstract] OR \"retrosplenial\"[Title/Abstract])",
+      "pubmed_count": 5,
+      "region_background_count": 2522,
+      "retrieved_pmids": 5
+    },
+    {
+      "brain_region": "CM",
+      "region_name": "centromedial amygdala",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (\"centromedial amygdala\"[Title/Abstract] OR \"central medial amygdala\"[Title/Abstract] OR \"central-medial amygdala\"[Title/Abstract])",
+      "pubmed_count": 0,
+      "region_background_count": 175,
+      "retrieved_pmids": 0
+    },
+    {
+      "brain_region": "IL",
+      "region_name": "infralimbic cortex",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (\"infralimbic cortex\"[Title/Abstract] OR \"infralimbic medial prefrontal cortex\"[Title/Abstract] OR \"infralimbic area\"[Title/Abstract])",
+      "pubmed_count": 16,
+      "region_background_count": 974,
+      "retrieved_pmids": 16
+    },
+    {
+      "brain_region": "MS",
+      "region_name": "medial septum",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (\"medial septum\"[Title/Abstract] OR \"medial septal\"[Title/Abstract])",
+      "pubmed_count": 3,
+      "region_background_count": 3122,
+      "retrieved_pmids": 3
+    },
+    {
+      "brain_region": "LH",
+      "region_name": "lateral hypothalamus",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (\"lateral hypothalamus\"[Title/Abstract] OR \"lateral hypothalamic\"[Title/Abstract])",
+      "pubmed_count": 23,
+      "region_background_count": 6739,
+      "retrieved_pmids": 23
+    },
+    {
+      "brain_region": "AM",
+      "region_name": "anteromedial thalamic nucleus",
+      "pubmed_query": "(\"Methamphetamine\"[Mesh] OR methamphetamine*[Title/Abstract] OR \"methamphetamine addiction\"[Title/Abstract] OR \"methamphetamine dependence\"[Title/Abstract] OR \"methamphetamine use disorder\"[Title/Abstract] OR \"methamphetamine self-administration\"[Title/Abstract] OR \"methamphetamine seeking\"[Title/Abstract] OR \"methamphetamine relapse\"[Title/Abstract] OR \"methamphetamine withdrawal\"[Title/Abstract]) AND (\"anteromedial thalamic nucleus\"[Title/Abstract] OR \"anteromedial thalamus\"[Title/Abstract] OR \"anterior medial thalamus\"[Title/Abstract])",
+      "pubmed_count": 1,
+      "region_background_count": 82,
+      "retrieved_pmids": 1
+    }
+  ]
+}

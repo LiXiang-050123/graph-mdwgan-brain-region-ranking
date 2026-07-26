@@ -1,0 +1,28 @@
+{
+  "repository": "meth-brain-region-prioritization",
+  "scripts": [
+    "feature_selection.py",
+    "graph_mdwgan.py",
+    "run_baseline_sensitivity.py",
+    "run_bibliometric_enrichment.py",
+    "run_extended_resampling.py",
+    "run_low_data_stress.py",
+    "run_primary_cv.py",
+    "run_pubmed_concordance.py",
+    "run_quality_5seeds.py",
+    "run_single_split_augmentation.py"
+  ],
+  "reference_files": [
+    "README.md",
+    "baseline_sensitivity_performance.csv",
+    "brain_region_ranking_summary.csv",
+    "figure8_latest_concordance_metrics.json",
+    "figure8_latest_literature_evidence.csv",
+    "figure8_latest_ml_ranking.csv",
+    "figure8_latest_pubmed_queries.json",
+    "low_data_stress_summary.csv",
+    "primary_topk_performance.csv",
+    "synthetic_quality_five_seed_summary.csv"
+  ],
+  "archive": "/mnt/data/meth-brain-region-prioritization-github.zip"
+}

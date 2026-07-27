@@ -2,38 +2,43 @@
 """
 run_low_data_stress.py
 
-低样本压力测试（Learning curve / Downsampling stress test），基于你已存在的 25-fold “训练记忆”文件，
-完全复用 outputs/cv_results/fold_****/fs_{METHOD}/cv_top{k}.csv，不重新训练生成器、不重跑筛选，
-只重训分类器，因此稳定、易复现、计算量可控。
+Low-data stress test (learning-curve/downsampling analysis) based on the fold-level
+training files produced by the 25-fold cross-validation workflow. The script reuses
+outputs/cv_results/fold_****/fs_{METHOD}/cv_top{k}.csv and refits only the downstream
+classifiers; generators and feature-ranking procedures are not rerun.
 
-本脚本回答顶刊审稿人最爱问的一个问题：
-“你说扩增有价值，那在更低真实样本时，你的方案是不是更稳、更抗退化？”
+Objective:
+Evaluate whether ranking-based models retain performance as the number of real training
+samples is progressively reduced.
 
-设计（对每个fold、每种方法、每个k、每个分类器）：
-- 从 cv_top{k}.csv 恢复该 fold 的真实训练集（Origin==RealTrain）与合成样本（Origin==Synthetic）。
-- 构造不同真实样本比例 frac（默认 0.2/0.4/0.6/0.8/1.0）的训练集：
-  1) real：仅用下采样后的真实训练集（分层抽样，保证每类至少 min_per_class）
-  2) aug ：在 real 的基础上，再从记忆文件中的合成池里按类抽样补足目标合成数量
-           目标：每类合成数量 ≈ (factor-1) * 该类真实数量（默认 factor=8）
-           若合成池不足则允许有放回抽样；若某类合成池为空，则退化为从真实中有放回抽样（保证不崩）
+Design (for each fold, method, k value, and classifier):
+- Recover real training samples (Origin==RealTrain) and synthetic samples (Origin==Synthetic)
+  from cv_top{k}.csv.
+- Construct training sets at real-sample fractions of 0.2/0.4/0.6/0.8/1.0 by default:
+  1) real: stratified downsampling of real training samples, retaining at least min_per_class.
+  2) aug: add class-matched synthetic samples to the downsampled real set, targeting
+          approximately (factor-1) synthetic samples per real sample (default factor=8).
+          Sampling with replacement is used when the synthetic pool is insufficient; if a
+          class-specific synthetic pool is unavailable, real samples are resampled as a
+          documented fallback.
 
-输出：
+Outputs:
 ./oneclick_lowdata_results_fast/
 - perf_lowdata_long.csv
 - perf_lowdata_mean_sd.csv
 - run.log
 - settings.json
 
-运行（推荐）：
+Example:
 cd .
 python run_low_data_stress.py --do_quick 1
 
-如果你想更“满血”一点（更多 frac、更大 RF 等），把 --do_quick 0，或自定义参数。
+Set --do_quick 0 or provide custom parameters for a more extensive analysis.
 
-注意：
-- 本脚本不再触碰生成器，因此不会出现“生成器产生 NA 导致崩”的问题；
-- 训练前对所有非有限值做了稳健填补（列中位数）；
-- 若某折某分位导致训练集只有单类，将自动跳过该组合并记录 NaN。
+Notes:
+- The generator is not invoked by this script.
+- Non-finite values are imputed using the training-column median before model fitting.
+- Combinations with a single-class training subset are skipped and recorded as NaN.
 """
 
 from __future__ import annotations
@@ -56,14 +61,14 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 
-# 屏蔽 sklearn 1.8+ 的 penalty 未来弃用警告（不影响当前行为）
+# Suppress the scikit-learn penalty deprecation warning without changing model behavior
 warnings.filterwarnings(
     "ignore",
     message=r".*'penalty' was deprecated in version 1\.8.*",
     category=FutureWarning,
     module=r"sklearn\.linear_model\._logistic",
 )
-# 兜底：更宽松的匹配，避免不同环境模块名差异
+# Broader fallback filter for environment-specific warning module names
 warnings.filterwarnings(
     "ignore",
     message=r".*penalty.*deprecated.*",
@@ -269,7 +274,7 @@ def build_aug_from_pools(real_sub: pd.DataFrame, syn_pool: pd.DataFrame, factor:
             replace = len(pool_g) < n_syn_target
             picked = pool_g.sample(n=n_syn_target, replace=replace, random_state=int(rng.randint(0, 10**9))).copy()
         else:
-            # 兜底：该类没有合成池时，从真实里有放回复制
+            # Documented fallback: resample real observations when the class-specific synthetic pool is unavailable
             replace = True
             picked = real_g.sample(n=n_syn_target, replace=replace, random_state=int(rng.randint(0, 10**9))).copy()
             picked["Origin"] = "Synthetic"
@@ -300,7 +305,7 @@ def main():
     ap.add_argument("--rf_trees", type=int, default=600)
 
     ap.add_argument("--do_quick", type=int, default=1,
-                    help="1=快速：rf_trees=300, fracs=0.2,0.4,0.6,0.8,1.0; 0=按参数原样跑")
+                    help="1=use the predefined reduced-compute settings; 0=use the supplied parameter values.")
     args = ap.parse_args()
 
     base_dir = Path(args.base_dir)

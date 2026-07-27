@@ -268,7 +268,7 @@ def consensus_tables(results: dict, out_dir: Path, topk: int):
 
 # ------------------ GNN-lite ------------------ #
 def build_norm_adj(X_train: np.ndarray, k: int = 8) -> np.ndarray:
-    """特征相关 + kNN 构图；对称归一化 \hat A"""
+    """Build a feature-correlation kNN graph and apply symmetric normalization (A-hat)."""
     C = np.corrcoef(X_train, rowvar=False)
     C = np.nan_to_num(C, nan=0.0)
     np.fill_diagonal(C, 0.0)
@@ -513,13 +513,13 @@ def run_pipeline(csv_path, use_origin="Both", out_dir="feat_select_results",
                    gnn_k, gnn_weight, perm_metric, perm_repeats]
     }).to_csv(out_dir / "summary.csv", index=False, encoding="utf-8-sig")
 
-    print("✅ 特征筛选完成。主要输出：")
-    print(f" - {methods_dir} （各方法完整排名）")
-    print(f" - {out_dir/'consensus_ranking.csv'} / {out_dir/'consensus_plots/consensus_scores.csv'}（共识排名/0-1分）")
-    print(f" - {gnn_dir/'gnn_lite_importance.csv'} 与 {gnn_dir/'consensus_plus_gnn.csv'}（GNN 及融合）")
+    print("Feature-selection workflow completed. Main outputs:")
+    print(f" - {methods_dir} (complete method-specific rankings)")
+    print(f" - {out_dir/'consensus_ranking.csv'} / {out_dir/'consensus_plots/consensus_scores.csv'} (consensus ranking and normalized scores)")
+    print(f" - {gnn_dir/'gnn_lite_importance.csv'} and {gnn_dir/'consensus_plus_gnn.csv'} (GNN-lite and fused rankings)")
     if with_perm_imp:
-        print(f" - {perm_dir}（置换重要性）")
-    print(f" - {shap_dir}（SHAP 全 ROI 图与 mean(|SHAP|) CSV）")
+        print(f" - {perm_dir} (permutation importance)")
+    print(f" - {shap_dir} (SHAP plots and mean(|SHAP|) tables for all ROIs)")
 
 
 # ------------------ CLI ------------------ #

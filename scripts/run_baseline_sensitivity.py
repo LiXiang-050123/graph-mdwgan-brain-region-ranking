@@ -2,23 +2,17 @@
 r"""
 run_baseline_sensitivity.py
 
-功能：
-1) 复用旧脚本每fold已训练好的 Ours ckpt（五折记忆）
-2) 三个“必做”实验：
-   - Permutation test（标签置换负对照）
-   - Real-only（不扩增对照）
-   - Factor sensitivity（多扩增倍数：如 2/4/8）
-3) 下游预测验证：三分类器
-   - Logistic Regression
-   - Linear SVM (probability=True)
-   - RandomForest
-4) 公平对照：raw / dedup / fixunique（默认都做）
-5) Bootstrap稳定性选择（频率核心集合 + Jaccard）
+Purpose:
+1) Optionally reuse fold-specific Graph-MDWGAN checkpoints from the reference CV run.
+2) Evaluate label-permutation controls, real-only baselines, and augmentation-factor sensitivity.
+3) Validate downstream performance with logistic regression, linear SVM, and random forest.
+4) Apply raw, deduplicated, and effective-unique-sample comparator settings.
+5) Quantify bootstrap selection stability using frequency summaries and Jaccard similarity.
 
-强约束（与旧脚本对齐以复用记忆）：
-- 外层 CV：RepeatedStratifiedKFold(random_state=cv_seed, n_splits, n_repeats)
-- fold_seed：cv_seed + fold_id * 17
-- 旧ckpt目录：reuse_cv_dir/fold_0001/ckpt_ours/{Saline,METH}/*.pt
+Checkpoint reuse requires exact alignment with the reference run:
+- Outer CV: RepeatedStratifiedKFold(random_state=cv_seed, n_splits, n_repeats)
+- fold_seed: cv_seed + fold_id * 17
+- checkpoint directory: reuse_cv_dir/fold_0001/ckpt_ours/{Saline,METH}/*.pt
 
 运行示例：
 python run_baseline_sensitivity.py ^
@@ -44,7 +38,7 @@ except Exception:
     def tqdm(iterable=None, **kwargs):
         return iterable if iterable is not None else []
 
-# --------- 全局警告抑制 ---------
+# --------- Warning configuration ---------
 warnings.filterwarnings("ignore")
 try:
     from sklearn.exceptions import ConvergenceWarning, DataConversionWarning
@@ -71,7 +65,7 @@ from graph_mdwgan import load_excel_data, train_group, EPS_POS
 META_COLS = {"Group", "Origin", "SampleID"}
 
 
-# ----------------- 基础工具 -----------------
+# ----------------- Core utilities -----------------
 def set_seed(seed: int):
     import random
     random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
@@ -512,7 +506,7 @@ def main():
     ap.add_argument("--sheet", type=str, default=None)
 
     ap.add_argument("--reuse_cv_dir", type=str, default="outputs/cv_results",
-                    help="旧脚本输出目录（包含 fold_0001/ckpt_ours/...）用于复用Ours记忆")
+                    help="Reference CV output directory containing fold_0001/ckpt_ours/... for optional Graph-MDWGAN checkpoint reuse.")
 
     ap.add_argument("--n_splits", type=int, default=5)
     ap.add_argument("--n_repeats", type=int, default=5)
@@ -528,7 +522,7 @@ def main():
 
     ap.add_argument("--dedup_decimals", type=int, default=6)
     ap.add_argument("--strict_ours", action="store_true",
-                    help="不复用记忆，强制重训Ours生成器（一般不需要）")
+                    help="Retrain Graph-MDWGAN within each fold rather than reusing compatible checkpoints.")
 
     # Permutation：为提速，默认只在 fusion+fixunique 上做，并且只做小k
     ap.add_argument("--do_permutation", action="store_true")
@@ -554,7 +548,7 @@ def main():
 
     set_seed(args.cv_seed)
 
-    # 读数据（顺序：先Saline后METH，与旧脚本一致）
+    # Load data in the same group order as the reference CV run: Saline followed by METH
     Xs, Xm, roi_names = load_excel_data(args.excel, args.sheet)
     rows = []
     for i in range(Xs.shape[0]):
@@ -590,7 +584,7 @@ def main():
         desc="CV Folds"
     ):
         fold_id += 1
-        fold_seed = args.cv_seed + fold_id * 17  # 与旧脚本对齐
+        fold_seed = args.cv_seed + fold_id * 17  # Align with the reference CV run
         set_seed(fold_seed)
 
         df_tr_real = df_all.iloc[tr_idx].copy()

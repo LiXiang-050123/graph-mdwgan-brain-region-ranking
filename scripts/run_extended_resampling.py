@@ -2,22 +2,23 @@
 """
 run_extended_resampling.py
 
-一区SCI：脑区筛选稳健性/公平性/负对照/Oracle 全套评估
-并【复用旧脚本 cv_roi_pipeline_repeatedkfold_x8.py 的 Ours ckpt（五折记忆）】：
-- 同样的 RepeatedStratifiedKFold(random_state=cv_seed, n_splits, n_repeats)
-- 同样的 fold_seed = cv_seed + fold_id * 17
-- 同样的 fold_dir = reuse_cv_dir/fold_{fold_id:04d}/ckpt_ours/(Saline|METH)
+Extended evaluation of brain-region ranking stability, comparator fairness,
+negative controls, and oracle performance. Existing Graph-MDWGAN checkpoints from
+the reference cross-validation run can be reused when the following settings match:
+- RepeatedStratifiedKFold(random_state=cv_seed, n_splits, n_repeats)
+- fold_seed = cv_seed + fold_id * 17
+- fold_dir = reuse_cv_dir/fold_{fold_id:04d}/ckpt_ours/(Saline|METH)
 
-输出目录（默认 onezone_results）：
+Output directory (default: onezone_results):
   perf_long.csv / perf_mean_sd.csv
   stability_long.csv / stability_mean_sd.csv
   freq_top10_<method>_<scheme>_<fair>.csv
   random_roi_baseline.csv
   oracle_long.csv / oracle_summary.csv
 
-说明：
-1) 复用 ckpt 仅减少“训练生成器”的耗时；每 fold 仍会重新采样生成合成数据（很快）。
-2) 稳定性选择（bootstrap）需要重新运行（这是你补齐一区证据链的核心）。
+Notes:
+1) Checkpoint reuse reduces generator-training time only; synthetic samples are regenerated independently for each fold.
+2) Bootstrap stability selection is recomputed for every run.
 """
 
 import os
@@ -30,7 +31,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-# --------- 全局警告抑制 ---------
+# --------- Warning configuration ---------
 warnings.filterwarnings("ignore")
 try:
     from sklearn.exceptions import ConvergenceWarning, DataConversionWarning
@@ -59,13 +60,13 @@ from sklearn.feature_selection import RFE
 from sklearn.neighbors import NearestNeighbors
 
 
-# ===== 依赖你的工程文件（同目录）=====
+# ===== Local project dependencies =====
 from graph_mdwgan import load_excel_data, train_group, EPS_POS
 
 META_COLS = {"Group", "Origin", "SampleID"}
 
 
-# ----------------- 基础工具 -----------------
+# ----------------- Core utilities -----------------
 def set_seed(seed: int):
     import random
     random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
@@ -124,7 +125,7 @@ def dedup_against_real(df_real: pd.DataFrame, df_syn: pd.DataFrame, decimals: in
 # ----------------- 复用 ckpt：定位 + 加载 + 采样 -----------------
 def _resolve_ckpt_path(ckpt_dir: Path, group: str) -> str:
     """
-    按旧脚本结构：fold_xxxx/ckpt_ours/<group>/best*.pt
+    Expected checkpoint structure: fold_xxxx/ckpt_ours/<group>/best*.pt
     找最新的 best*.pt；若没有 best，则找任何 *.pt
     """
     group_dir = ckpt_dir / group
@@ -193,7 +194,7 @@ def make_ours_groupwise_reuse_ckpt(df_tr_real: pd.DataFrame, factor: int, fold_s
                                   fold_dir_old: Path, strict_retrain: bool):
     """
     优先复用 fold_dir_old/ckpt_ours 的 ckpt。
-    若 ckpt 缺失或 strict_retrain=True，则按旧脚本逻辑在该 fold 训练生成器并保存到同目录。
+    If the checkpoint is unavailable or strict_retrain=True, train the generator within the current fold and save it to the same directory.
     """
     device = "cuda" if torch.cuda.is_available() else "cpu"
     feats = feat_cols(df_tr_real)
@@ -554,7 +555,7 @@ def main():
     ap.add_argument("--excel", type=str, default="data/brain_region_cfos.xlsx")
     ap.add_argument("--sheet", type=str, default=None)
 
-    # 与旧脚本一致的 CV 参数
+    # Cross-validation parameters must match the reference run
     ap.add_argument("--factor", type=int, default=8)
     ap.add_argument("--n_splits", type=int, default=5)
     ap.add_argument("--n_repeats", type=int, default=5)
@@ -564,20 +565,20 @@ def main():
     ap.add_argument("--methods", type=str, default="Ours,ROS,SMOTE")
     ap.add_argument("--smote_k", type=int, default=5)
 
-    # 复用旧 fold 目录（必须指向你旧脚本的 out_dir，比如 cv_results）
+    # Directory containing fold-level checkpoints from the reference CV run
     ap.add_argument("--reuse_cv_dir", type=str, default="outputs/cv_results",
-                    help="旧脚本输出目录（包含 fold_0001/ckpt_ours/...），用于复用Ours ckpt")
+                    help="Reference CV output directory containing fold_0001/ckpt_ours/... for optional Graph-MDWGAN checkpoint reuse.")
 
     # Ours 控制
     ap.add_argument("--strict_ours", action="store_true",
-                    help="强制重训生成器（不复用记忆）。默认不加：优先复用旧ckpt。")
+                    help="Retrain the generator within each fold instead of reusing compatible checkpoints.")
 
     # 稳定性选择
     ap.add_argument("--k_list", type=str, default="1,3,5,10,20")
     ap.add_argument("--bootstrap_B", type=int, default=50)
     ap.add_argument("--gnn_weight", type=float, default=1.0/6.0)
 
-    # 公平对照（顶级审稿人标准：两项都开）
+    # Comparator controls for duplicate handling and effective sample-size matching
     ap.add_argument("--dedup_decimals", type=int, default=6)
 
     # Random ROI 基线
@@ -606,7 +607,7 @@ def main():
 
     set_seed(args.cv_seed)
 
-    # 读数据（构造顺序必须与旧脚本一致：先Saline后METH）
+    # Load data in the same group order as the reference CV run: Saline followed by METH
     Xs, Xm, roi_names = load_excel_data(args.excel, args.sheet)
     rows: list[dict[str, object]] = []
     for i in range(Xs.shape[0]):
@@ -650,7 +651,7 @@ def main():
         start=1
     ):
 
-        # 【关键对齐】：与旧脚本一致
+        # Maintain exact alignment with the reference CV configuration
         fold_seed = args.cv_seed + fold_id * 17
         set_seed(fold_seed)
 
@@ -658,7 +659,7 @@ def main():
         df_va = df_all.iloc[va_idx].copy()
         df_tr_real["Origin"] = "RealTrain"
 
-        # 【关键对齐】：旧脚本 fold 目录
+        # Fold directory aligned with the reference CV run
         fold_dir_old = reuse_dir / f"fold_{fold_id:04d}"
 
         for method in tqdm(methods, desc="Methods", leave=False):

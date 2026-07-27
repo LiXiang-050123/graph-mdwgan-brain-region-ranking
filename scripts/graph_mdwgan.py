@@ -1,20 +1,21 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Hybrid Graph-MDWGAN (防过拟合优化版) + 可信度评估
-===========================================
-针对小数据集的特殊优化，同时防止过拟合，集成SCI投稿可信度评估
+Hybrid Graph-MDWGAN with quality-control assessment
+====================================================
+Graph-based data augmentation for small correlated datasets with regularization,
+early stopping, and quantitative quality-control diagnostics.
 
-核心特性：
-- Graph-MDWGAN数据增强
-- 全面的可信度评估
-- SCI投稿建议
+Core components:
+- Graph-MDWGAN data augmentation
+- Distributional and structural quality assessment
+- Reproducible diagnostic outputs
 
-使用示例：
+Example:
     python graph_mdwgan.py --mode all --excel data/brain_region_cfos.xlsx --target_total 1000
 """
 
-# 更全面的警告抑制
+# Warning configuration
 import warnings
 import numpy as np
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -23,12 +24,12 @@ warnings.filterwarnings("ignore", message="divide by zero encountered")
 warnings.filterwarnings("ignore", message="invalid value encountered in multiply")
 warnings.filterwarnings("ignore", message="invalid value encountered in sqrt")
 
-# 抑制sklearn警告
+# Suppress selected scikit-learn warnings
 from sklearn.exceptions import ConvergenceWarning, DataConversionWarning
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 warnings.filterwarnings("ignore", category=DataConversionWarning)
 
-# 设置NumPy全局错误处理
+# Configure NumPy floating-point error handling
 np.seterr(divide='ignore', invalid='ignore', over='ignore', under='ignore')
 
 import os, json, random, argparse
@@ -41,12 +42,12 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import roc_auc_score
 from sklearn.linear_model import LogisticRegression
 
-# 添加缺失的导入
+# Statistical and interpolation utilities
 from scipy.stats import norm
 from scipy.interpolate import PchipInterpolator
 
-# ========================= 全局超参（专注提升BEFORE分数版 + Saline组特殊优化） =========================
-# 模型/优化（增加容量）
+# ========================= Global hyperparameters =========================
+# Model architecture and optimization
 Z_DIM = 128
 G_HIDDEN = 512      # 384 → 512，恢复模型容量
 D_HIDDEN = 384      # 256 → 384，增加判别器容量
@@ -54,7 +55,7 @@ GM_WIDTH = 256      # 192 → 256，增加GraphMix容量
 GM_LAYERS = 1       # 3 → 1，大幅减少层数
 N_DISCRI = 3        # 2 → 3，恢复判别器数量
 
-# GraphMix参数调整
+# GraphMix parameters
 GM_MIX_RATIO = 0.05  # 新增：很小的混合比例
 GM_TOPK = 5          # 新增：稀疏化参数
 GM_DROPOUT = 0.2     # 新增：GraphMix dropout率
@@ -66,23 +67,23 @@ LR_G = 2e-5         # 3e-5 → 2e-5，针对Saline组降低学习率，更精细
 LR_D = 1.5e-5       # 2e-5 → 1.5e-5，判别器学习率也适度降低
 EMA_DECAY = 0.999   # 0.998 → 0.999，增强EMA
 
-# WGAN 正则（针对Saline组适度降低，避免过度约束）
+# WGAN regularization
 GP_LAMBDA = 10.0    # 12.0 → 10.0，进一步降低梯度惩罚
 R1_GAMMA = 2e-3     # 3e-3 → 2e-3，降低R1正则
 INSTANCE_NOISE_STD = 0.008  # 0.010 → 0.008，降低实例噪声
 
-# 训练节奏（更积极的策略）
+# Training schedule
 N_CRITIC_INIT = 3   # 4 → 3，减少判别器更新频率，给生成器更多机会
 N_CRITIC_LATE = 1   # 2 → 1，后期更多关注生成器
 LATE_START_FRAC = 0.40       # 0.50 → 0.40，提前强化时机
 CRITIC_SWITCH_EPOCH = 1000   # 1200 → 1000，提前降低训练强度
 
-# 防过拟合参数（适度放松）
+# Generalization controls
 DROPOUT_RATE = 0.08   # 0.10 → 0.08，略微降低dropout
 NOISE_DECAY = 0.995   # 0.99 → 0.995，更缓慢的噪声衰减
 GENERALIZATION_WEIGHT = 0.3  # 0.4 → 0.3，更偏向训练质量
 
-# 多目标正则（针对Saline组专门优化）
+# Multi-objective regularization
 LAMBDA_MEAN  = 2.5    # 1.5 → 2.5，大幅增加均值匹配权重
 LAMBDA_STD   = 2.5    # 1.5 → 2.5，大幅增加标准差匹配权重  
 LAMBDA_CORAL = 1.2    # 0.7 → 1.2，增加相关性损失权重
@@ -91,22 +92,22 @@ LAMBDA_SWD   = 1.8    # 1.5 → 1.8，增加SWD权重
 LAMBDA_MOM34 = 0.5    # 0.3 → 0.5，增加高阶矩匹配
 LAMBDA_MAX   = 8.0    # 6.0 → 8.0，提高最大权重限制
 
-# 多样性约束（适度提高）
+# Diversity constraints
 DIVERSITY_WEIGHT = 1.5       # 1.0 → 1.5，适度提高多样性权重
 MIN_DISTANCE_FACTOR = 0.08   # 0.06 → 0.08，增加最小距离要求
 
-# 早停优化（增加patience，给Saline组更多训练时间）
+# Early-stopping parameters
 MIN_IMPROVE = 0.1     # 0.15 → 0.1，更容易接受改进
 PATIENCE = 20         # 12 → 20，大幅增加耐心
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-# ========================= 其他常量 =========================
+# ========================= Additional constants =========================
 LOG_EVERY = 50
 EVAL_EVERY = 80       # 100 → 80，更频繁评估
 EPS_POS = 1e-6
 
-# ========================= 工具：随机数 & 数据加载 =========================
+# ========================= Randomness and data-loading utilities =========================
 def set_seed(s: int):
     random.seed(s); np.random.seed(s); torch.manual_seed(s); torch.cuda.manual_seed_all(s)
 
@@ -115,11 +116,11 @@ def read_excel(path: str, sheet: str|None):
     return list(obj.values())[0] if isinstance(obj, dict) else obj
 
 def load_excel_data(path: str, sheet: str | None):
-    """读取 c-Fos 原始矩阵（行=脑区、列=样本），自动识别 Saline/METH 列"""
+    """Load the c-Fos matrix (rows=regions, columns=samples) and identify Saline/METH columns."""
     df = read_excel(path, sheet)
 
     if df.shape[1] < 3:
-        raise ValueError(f"表的列太少（{df.shape[1]} 列），需要：1列ROI + 至少2列样本")
+        raise ValueError(f"The input table has too few columns ({df.shape[1]}). Expected one ROI column and at least two sample columns.")
 
     roi_col = df.columns[0]
     roi_names = df[roi_col].astype(str).tolist()
@@ -155,7 +156,7 @@ def load_excel_data(path: str, sheet: str | None):
     if Xs.shape[1] != n_roi or Xm.shape[1] != n_roi:
         raise ValueError(f"样本维度与脑区数不一致：ROI={n_roi}, Saline维度={Xs.shape[1]}, METH维度={Xm.shape[1]}")
 
-    print(f"✅ 成功读取：ROI={n_roi}，Saline={Xs.shape[0]}，METH={Xm.shape[0]}")
+    print(f"Loaded data: ROI={n_roi}, Saline={Xs.shape[0]}, METH={Xm.shape[0]}")
     return np.clip(Xs,0,None), np.clip(Xm,0,None), [str(x) for x in roi_names]
 
 # ========================= 图构建（稳健相关） =========================
@@ -640,7 +641,7 @@ def train_group(group_name, X_real_np, Ahat_np, device=DEVICE, seed=42, out_dir=
     if group_name == "Saline":
         default_score_threshold = 75.0  # 提高Saline组的分数要求
         default_gap_threshold = 15.0    # 降低泛化差异容忍度
-        print(f"[{group_name}] 🎯 Saline组特殊优化：高标准模型复用策略")
+        print(f"[{group_name}] Evaluating compatibility of the existing Saline checkpoint")
     else:
         default_score_threshold = 70.0
         default_gap_threshold = 20.0
@@ -662,7 +663,7 @@ def train_group(group_name, X_real_np, Ahat_np, device=DEVICE, seed=42, out_dir=
                 gap_threshold = fine_tune_kwargs.get('max_gap', default_gap_threshold)
                 
                 if existing_score >= score_threshold and generalization_gap <= gap_threshold:
-                    print(f"[{group_name}] ✅ 模型满足条件，复用现有模型")
+                    print(f"[{group_name}] Existing checkpoint satisfies the reuse criteria")
                     # 重建 scaler
                     scaler = StandardScaler()
                     scaler.mean_ = ck["scaler_mean"]
@@ -677,15 +678,15 @@ def train_group(group_name, X_real_np, Ahat_np, device=DEVICE, seed=42, out_dir=
                     
                     return best, scaler
                 else:
-                    print(f"[{group_name}] ⚠️  模型不满足条件(分数<{score_threshold}或差异>{gap_threshold})，将重新训练")
+                    print(f"[{group_name}] Existing checkpoint does not satisfy the reuse criteria (score<{score_threshold} or gap>{gap_threshold}); retraining")
         except Exception as e:
             print(f"[{group_name}] 加载已有模型失败: {e}，将重新训练")
     elif force_retrain:
-        print(f"[{group_name}] 🔄 强制重新训练模式")
+        print(f"[{group_name}] Forced retraining enabled")
 
     # 针对Saline组的特殊训练策略
     if group_name == "Saline":
-        print(f"[{group_name}] 🎯 启用Saline组专用优化策略")
+        print(f"[{group_name}] Applying the predefined Saline-group training configuration")
         
         # 更保守的训练参数
         patience_mult = fine_tune_kwargs.get('patience_mult', 2.5)  # 大幅增加耐心
@@ -712,7 +713,7 @@ def train_group(group_name, X_real_np, Ahat_np, device=DEVICE, seed=42, out_dir=
     is_tiny_dataset = len(X_real_np) < 8
     is_small_dataset = len(X_real_np) < 15
     
-    # 重复率问题特殊处理：更激进的防过拟合
+    # Additional duplicate-control regularization
     if is_tiny_dataset:
         print(f"[{group_name}] 超小数据集({len(X_real_np)}样本)，激进防过拟合策略")
         dropout_rate = DROPOUT_RATE * 2.0    # 大幅提高dropout
@@ -837,7 +838,7 @@ def train_group(group_name, X_real_np, Ahat_np, device=DEVICE, seed=42, out_dir=
     print(f"   模型配置: G_hidden={g_hidden}, GM_width={gm_width}, LR_G={lr_g:.2e}")
     print(f"   正则化权重: mean={lam_mean:.2f}, std={lam_std:.2f}, coral={lam_coral:.2f}, mmd={lam_mmd:.2f}")
     if group_name == "Saline":
-        print(f"   🎯 Saline优化: 均值/标准差权重已大幅增强")
+        print("   Saline configuration: increased mean- and standard-deviation matching weights")
 
     best = {"path": None, "score_b": -1.0, "score_a": -1.0, "score_h": -1.0}
     # 新增：分别跟踪BEFORE和综合分数的最佳模型
@@ -969,7 +970,7 @@ def train_group(group_name, X_real_np, Ahat_np, device=DEVICE, seed=42, out_dir=
         if epoch % LOG_EVERY == 0:
             print(f"[{group_name}] epoch {epoch}/{EPOCHS}  L_G={lossG.item():.3f}  div={div_loss.item():.3f}  adv={adv.item():.3f}")
 
-        # 更激进的评估和更严格的早停
+        # More frequent evaluation and stricter early stopping
         if epoch % eval_every_adjusted == 0 or epoch == EPOCHS:
             with torch.no_grad():
                 Ge = Generator(Z_DIM, feat_dim, hidden=g_hidden, gm_width=gm_width, dropout=0.0).to(device)
@@ -1029,7 +1030,7 @@ def train_group(group_name, X_real_np, Ahat_np, device=DEVICE, seed=42, out_dir=
                 
                 # 严格的质量检查
                 is_good_quality = sa_train >= 70 and generalization_gap <= 15
-                quality_check = "✅" if is_good_quality else "❌"
+                quality_check = "PASS" if is_good_quality else "FAIL"
                 print(f"[{group_name}] eval@{epoch}: Train={sa_train:.1f} Val={sa_val:.1f} Gap={generalization_gap:.1f} Score={score_h:.1f} {quality_check}")
 
                 # 非常温和的权重调整（避免过度优化）
@@ -1076,14 +1077,14 @@ def train_group(group_name, X_real_np, Ahat_np, device=DEVICE, seed=42, out_dir=
                     before_path = os.path.join(ckpt_dir, f"best_before_seed{seed}.pt")
                     torch.save(checkpoint_data, before_path)
                     best_before.update(path=before_path, score_b=sb_train, score_a=sa_train, score_h=score_h, epoch=epoch)
-                    print(f"[{group_name}] 🎯 新BEFORE最佳: {sb_train:.1f} (epoch {epoch})")
+                    print(f"[{group_name}] New best pre-processing score: {sb_train:.1f} (epoch {epoch})")
                 
                 # 保存综合最佳模型
                 if hybrid_improved:
                     hybrid_path = os.path.join(ckpt_dir, f"best_hybrid_seed{seed}.pt")
                     torch.save(checkpoint_data, hybrid_path)
                     best_hybrid.update(path=hybrid_path, score_b=sb_train, score_a=sa_train, score_h=score_h, epoch=epoch)
-                    print(f"[{group_name}] 🏆 新综合最佳: {score_h:.1f} (epoch {epoch})")
+                    print(f"[{group_name}] New best composite score: {score_h:.1f} (epoch {epoch})")
                 
                 # 决定最终使用哪个模型：优先BEFORE分数，但要综合考虑
                 final_path = os.path.join(ckpt_dir, f"best_seed{seed}.pt")
@@ -1162,8 +1163,8 @@ def train_group(group_name, X_real_np, Ahat_np, device=DEVICE, seed=42, out_dir=
                     import shutil
                     shutil.copy2(selected_model["path"], final_path)
                     
-                print(f"[{group_name}] 🎯 模型选择: {selection_reason}")
-                print(f"[{group_name}] 📋 最终模型: BEFORE={selected_model['score_b']:.1f}, 综合={selected_model['score_h']:.1f}")
+                print(f"[{group_name}] Model-selection criterion: {selection_reason}")
+                print(f"[{group_name}] Selected model: pre-processing={selected_model['score_b']:.1f}, composite={selected_model['score_h']:.1f}")
                 
                 # 早停判断基于BEFORE最佳模型
                 current_best_before = best_before["score_b"]
@@ -1171,7 +1172,7 @@ def train_group(group_name, X_real_np, Ahat_np, device=DEVICE, seed=42, out_dir=
                 
                 if improved:
                     bad = 0
-                    print(f"[{group_name}] ✅ 有改进: BEFORE最佳={current_best_before:.1f}, 综合最佳={best_hybrid['score_h']:.1f}")
+                    print(f"[{group_name}] Improvement detected: best pre-processing={current_best_before:.1f}, best composite={best_hybrid['score_h']:.1f}")
                 else:
                     bad += 1
                     
@@ -1194,12 +1195,12 @@ def train_group(group_name, X_real_np, Ahat_np, device=DEVICE, seed=42, out_dir=
                     elif current_best_before >= 55 and bad >= int(patience_adjusted * 2.0):
                         early_stop_reason = f"较低BEFORE质量（BEFORE={current_best_before:.1f}）"
                     
-                    # 5. 绝对兜底
+                    # 5. Final fallback selection
                     elif bad >= int(patience_adjusted * 2.5):
                         early_stop_reason = f"绝对耐心用尽（{int(patience_adjusted * 2.5)}次无改进）"
                     
                     if early_stop_reason:
-                        print(f"[{group_name}] 🛑 早停于 epoch {epoch}: {early_stop_reason}")
+                        print(f"[{group_name}] Early stopping at epoch {epoch}: {early_stop_reason}")
                         print(f"[{group_name}] 最终选择: BEFORE={best['score_b']:.1f}, AFTER={best['score_a']:.1f}, 综合={best['score_h']:.1f}")
                         print(f"[{group_name}] BEFORE历史最佳: {best_before['score_b']:.1f} (epoch {best_before['epoch']})")
                         print(f"[{group_name}] 综合历史最佳: {best_hybrid['score_h']:.1f} (epoch {best_hybrid['epoch']})")
@@ -1224,27 +1225,27 @@ def train_group(group_name, X_real_np, Ahat_np, device=DEVICE, seed=42, out_dir=
     print(f"[{group_name}] 训练完成: BEFORE={final_before:.1f}, 综合={final_score:.1f}")
     
     # 显示详细的模型选择信息
-    print(f"[{group_name}] 📊 训练统计:")
-    print(f"   BEFORE最佳: {best_before['score_b']:.1f} (epoch {best_before['epoch']})")
-    print(f"   综合最佳: {best_hybrid['score_h']:.1f} (epoch {best_hybrid['epoch']})")
-    print(f"   最终选择: BEFORE={final_before:.1f}, 综合={final_score:.1f}")
+    print(f"[{group_name}] Training summary:")
+    print(f"   Best pre-processing score: {best_before['score_b']:.1f} (epoch {best_before['epoch']})")
+    print(f"   Best composite score: {best_hybrid['score_h']:.1f} (epoch {best_hybrid['epoch']})")
+    print(f"   Selected checkpoint: pre-processing={final_before:.1f}, composite={final_score:.1f}")
     
-    # 更新训练建议
+    # Print neutral diagnostic guidance
     if final_before < 60:
-        print(f"[{group_name}] ❌ BEFORE分数很低({final_before:.1f})，强烈建议:")
-        print(f"           1. 延长训练: --epochs {EPOCHS * 2}")
-        print(f"           2. 降低正则化: --reg_mult 0.5")
-        print(f"           3. 增加模型容量: --hidden_mult 1.2")
-        print(f"           4. 增加耐心: --patience_mult 2.0")
+        print(f"[{group_name}] Very low pre-processing score ({final_before:.1f}); review the following diagnostics:")
+        print(f"           1. Consider a longer training schedule: --epochs {EPOCHS * 2}")
+        print("           2. Review regularization strength: --reg_mult 0.5")
+        print("           3. Review model capacity: --hidden_mult 1.2")
+        print("           4. Increase early-stopping patience: --patience_mult 2.0")
     elif final_before < 70:
-        print(f"[{group_name}] ⚠️  BEFORE分数较低({final_before:.1f})，建议:")
-        print(f"           1. 适度延长训练: --epochs {int(EPOCHS * 1.5)}")
+        print(f"[{group_name}] Low pre-processing score ({final_before:.1f}); review the diagnostics below:")
+        print(f"           1. Consider a moderately longer training schedule: --epochs {int(EPOCHS * 1.5)}")
         print(f"           2. 降低正则化: --reg_mult 0.6")
         print(f"           3. 增加耐心: --patience_mult 1.8")
     elif final_before < 80:
-        print(f"[{group_name}] ℹ️  BEFORE分数中等({final_before:.1f})，接近良好水平")
+        print(f"[{group_name}] Moderate pre-processing score ({final_before:.1f})")
     else:
-        print(f"[{group_name}] ✅ BEFORE分数优秀({final_before:.1f})")
+        print(f"[{group_name}] High pre-processing score ({final_before:.1f})")
     
     return best, scaler
 
@@ -1389,22 +1390,22 @@ def save_formatted_excel(saline_np, meth_np, syn_saline, syn_meth, feat_names,
         df_all.to_excel(writer, sheet_name=sheet_name, index=False)
     return out_xlsx
 
-# ========================= 可信度评估系统 =========================
+# ========================= Quality-control assessment =========================
 
 def run_credibility_assessment(real_saline, real_meth, syn_saline, syn_meth, roi_names):
     """
-    综合可信度评估系统
-    
+    Evaluate distributional, structural, and basic biological plausibility checks.
+
     Returns:
-        issues: 发现的问题列表
-        strengths: 优势点列表  
-        summary: 总体评估摘要
+        issues: identified limitations or failed checks
+        strengths: passed checks and favorable diagnostics
+        summary: structured quality-control summary
     """
     issues = []
     strengths = []
     
-    # 基本数据检查
-    print("   🔍 基本数据检查...")
+    # Basic data checks
+    print("   Running basic data checks...")
     
     n_real_saline = len(real_saline)
     n_real_meth = len(real_meth) 
@@ -1412,28 +1413,28 @@ def run_credibility_assessment(real_saline, real_meth, syn_saline, syn_meth, roi
     n_syn_meth = len(syn_meth)
     n_features = real_saline.shape[1] if len(real_saline) > 0 else 0
     
-    # 数据量评估
+    # Sample-size assessment
     if n_real_saline < 10 or n_real_meth < 10:
-        issues.append("真实样本量过小，存在严重过拟合风险")
+        issues.append("The real-sample size is very small and may increase overfitting risk.")
     elif n_real_saline < 20 or n_real_meth < 20:
-        issues.append("真实样本量较小，需要额外验证")
+        issues.append("The real-sample size is limited; additional validation is recommended.")
     else:
-        strengths.append("真实样本量充足")
+        strengths.append("The real-sample size is adequate for the configured analysis.")
     
-    # 特征维度检查
+    # Feature-to-sample ratio
     total_samples = n_real_saline + n_real_meth
     if n_features > 0 and total_samples / n_features < 2:
-        issues.append("样本数相对特征数过少，存在维度诅咒问题")
+        issues.append("The sample-to-feature ratio is low and may increase high-dimensional instability.")
     elif n_features > 0 and total_samples / n_features < 5:
-        issues.append("样本特征比偏低，建议增加正则化")
+        issues.append("The sample-to-feature ratio is limited; regularization and sensitivity analyses are recommended.")
     else:
-        strengths.append("样本特征比合理")
+        strengths.append("The sample-to-feature ratio is acceptable for the configured workflow.")
     
     # 1. 统计学分析
-    print("   📊 统计学分析...")
+    print("   Evaluating summary-statistic preservation...")
     
     try:
-        # 计算基本统计量差异
+        # Calculate relative differences in means and standard deviations
         def calc_stat_diff(real, syn, name):
             if len(real) == 0 or len(syn) == 0:
                 return 1.0, 1.0  # 返回最大差异
@@ -1444,33 +1445,33 @@ def run_credibility_assessment(real_saline, real_meth, syn_saline, syn_meth, roi
         saline_mean_diff, saline_std_diff = calc_stat_diff(real_saline, syn_saline, "Saline")
         meth_mean_diff, meth_std_diff = calc_stat_diff(real_meth, syn_meth, "METH")
         
-        # 评估统计量保持程度
+        # Evaluate preservation of first- and second-order statistics
         if max(saline_mean_diff, meth_mean_diff) < 0.1:
-            strengths.append("均值保持优秀（相对误差<10%）")
+            strengths.append("Mean preservation passed the <10% relative-error threshold.")
         elif max(saline_mean_diff, meth_mean_diff) < 0.2:
-            strengths.append("均值保持良好（相对误差<20%）")
+            strengths.append("Mean preservation passed the <20% relative-error threshold.")
         else:
-            issues.append(f"均值偏差较大（Saline: {saline_mean_diff:.1%}, METH: {meth_mean_diff:.1%}）")
+            issues.append(f"Mean differences exceed the preferred range (Saline: {saline_mean_diff:.1%}, METH: {meth_mean_diff:.1%}).")
         
         if max(saline_std_diff, meth_std_diff) < 0.15:
-            strengths.append("方差保持优秀（相对误差<15%）")
+            strengths.append("Standard-deviation preservation passed the <15% relative-error threshold.")
         elif max(saline_std_diff, meth_std_diff) < 0.3:
-            strengths.append("方差保持良好（相对误差<30%）")
+            strengths.append("Standard-deviation preservation passed the <30% relative-error threshold.")
         else:
-            issues.append(f"方差偏差较大（Saline: {saline_std_diff:.1%}, METH: {meth_std_diff:.1%}）")
+            issues.append(f"Standard-deviation differences exceed the preferred range (Saline: {saline_std_diff:.1%}, METH: {meth_std_diff:.1%}).")
     except Exception as e:
-        print(f"   ⚠️  统计分析出错: {e}")
-        issues.append("统计分析失败")
+        print(f"   Summary-statistic assessment failed: {e}")
+        issues.append("Summary-statistic assessment failed.")
     
-    # 2. 分布一致性检验（简化版）
-    print("   📈 分布一致性检验...")
+    # 2. Distributional similarity check
+    print("   Evaluating distributional similarity...")
     
     try:
-        # 简化的分布相似性计算
+        # Quantile-based distributional similarity
         def calc_distribution_similarity(real, syn):
             if len(real) == 0 or len(syn) == 0:
                 return 0.0
-            # 比较分位数
+            # Compare quartiles
             real_quantiles = np.quantile(real.flatten(), [0.25, 0.5, 0.75])
             syn_quantiles = np.quantile(syn.flatten(), [0.25, 0.5, 0.75])
             similarity = 1.0 - np.mean(np.abs(real_quantiles - syn_quantiles) / (real_quantiles + 1e-8))
@@ -1480,33 +1481,33 @@ def run_credibility_assessment(real_saline, real_meth, syn_saline, syn_meth, roi
         meth_dist_sim = calc_distribution_similarity(real_meth, syn_meth)
         
         if min(saline_dist_sim, meth_dist_sim) > 0.7:
-            strengths.append("分布相似度优秀")
+            strengths.append("Distributional similarity exceeded the high-quality threshold.")
         elif min(saline_dist_sim, meth_dist_sim) > 0.5:
-            strengths.append("分布相似度良好")
+            strengths.append("Distributional similarity exceeded the acceptable threshold.")
         else:
-            issues.append("分布相似度需要改进")
+            issues.append("Distributional similarity was below the preferred threshold.")
     except Exception as e:
-        print(f"   ⚠️  分布分析出错: {e}")
-        issues.append("分布一致性检验失败")
+        print(f"   Distributional assessment failed: {e}")
+        issues.append("Distributional similarity assessment failed.")
     
-    # 3. 相关性结构保持（简化版）
-    print("   🔗 相关性结构分析...")
+    # 3. Correlation-structure preservation
+    print("   Evaluating correlation-structure preservation...")
     
     try:
         def calc_correlation_preservation(real, syn):
             if len(real) < 2 or len(syn) < 2 or real.shape[1] < 2:
-                return 1.0  # 无法计算时返回完美分数
+                return 1.0  # Neutral fallback when the correlation matrix cannot be estimated
             
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 real_corr = np.corrcoef(real.T)
                 syn_corr = np.corrcoef(syn.T)
                 
-                # 处理NaN值
+                # Replace non-finite correlation entries
                 real_corr = np.nan_to_num(real_corr, nan=0.0)
                 syn_corr = np.nan_to_num(syn_corr, nan=0.0)
                 
-                # 计算相关矩阵的相似度
+                # Calculate mean absolute correlation-matrix agreement
                 corr_diff = np.abs(real_corr - syn_corr)
                 preservation = 1.0 - np.mean(corr_diff)
                 return max(0, preservation)
@@ -1515,98 +1516,98 @@ def run_credibility_assessment(real_saline, real_meth, syn_saline, syn_meth, roi
         meth_corr_pres = calc_correlation_preservation(real_meth, syn_meth)
         
         if min(saline_corr_pres, meth_corr_pres) > 0.8:
-            strengths.append("相关性结构保持优秀")
+            strengths.append("Correlation-structure preservation exceeded the high-quality threshold.")
         elif min(saline_corr_pres, meth_corr_pres) > 0.6:
-            strengths.append("相关性结构保持良好")
+            strengths.append("Correlation-structure preservation exceeded the acceptable threshold.")
         else:
-            issues.append("相关性结构保持需要改进")
+            issues.append("Correlation-structure preservation was below the preferred threshold.")
     except Exception as e:
-        print(f"   ⚠️  相关性分析出错: {e}")
-        issues.append("相关性结构分析失败")
+        print(f"   Correlation-structure assessment failed: {e}")
+        issues.append("Correlation-structure assessment failed.")
     
-    # 4. 生物学合理性检查
-    print("   🧬 生物学合理性检查...")
+    # 4. Basic plausibility checks
+    print("   Running basic plausibility checks...")
     
     try:
-        # 检查负值
+        # Check for negative generated values
         neg_saline = np.sum(syn_saline < 0) if len(syn_saline) > 0 else 0
         neg_meth = np.sum(syn_meth < 0) if len(syn_meth) > 0 else 0
         
         if neg_saline + neg_meth == 0:
-            strengths.append("生成数据符合生物学约束（无负值）")
+            strengths.append("Generated values satisfy the non-negativity constraint.")
         else:
-            issues.append(f"生成数据包含{neg_saline + neg_meth}个负值，违反生物学约束")
+            issues.append(f"Generated data contain {neg_saline + neg_meth} negative values.")
         
-        # 检查极端异常值
+        # Check for extreme generated values
         if len(syn_saline) > 0 and len(syn_meth) > 0:
             syn_max = max(np.max(syn_saline), np.max(syn_meth))
             real_max = max(np.max(real_saline), np.max(real_meth))
             
             if syn_max > real_max * 3:
-                issues.append("生成数据包含极端异常值")
+                issues.append("Generated data contain values exceeding the predefined extreme-value threshold.")
             else:
-                strengths.append("生成数据范围合理")
+                strengths.append("Generated values remain within the predefined range criterion.")
     except Exception as e:
-        print(f"   ⚠️  生物学检查出错: {e}")
-        issues.append("生物学合理性检查失败")
+        print(f"   Plausibility assessment failed: {e}")
+        issues.append("Basic plausibility assessment failed.")
     
-    # 5. 方法学优势
+    # 5. Methodological components
     strengths.extend([
-        "使用Graph-MDWGAN捕获脑区间相关性",
-        "多种正则化技术确保训练稳定",
-        "EMA技术提高生成一致性",
-        "多目标损失函数保证统计特性匹配"
+        "Graph-MDWGAN incorporates inter-regional correlation structure.",
+        "Multiple regularization terms are used to stabilize training.",
+        "Exponential moving-average weights support stable generation.",
+        "The multi-objective loss targets several distributional properties."
     ])
     
-    # 6. 综合评分和建议
-    print("   📝 生成投稿建议...")
+    # 6. Aggregate internal quality-control score
+    print("   Computing the internal quality-control summary...")
     
-    # 简化的评分系统
-    score = 0.5  # 基础分
+    # Heuristic internal score used for diagnostic reporting only
+    score = 0.5  # Baseline score
     
-    # 根据问题和优势调整分数
+    # Adjust the score according to passed and failed checks
     score -= len([i for i in issues if "严重" in i or "过小" in i]) * 0.2
     score -= len([i for i in issues if "较大" in i or "需要改进" in i]) * 0.1
     score += len([s for s in strengths if "优秀" in s]) * 0.1
     score += len([s for s in strengths if "良好" in s]) * 0.05
     
-    score = max(0, min(1, score))  # 限制在0-1之间
+    score = max(0, min(1, score))  # Constrain the score to [0, 1]
     
-    # 生成建议
+    # Generate neutral quality-control guidance
     if score >= 0.8 and len([i for i in issues if "严重" in i or "过小" in i]) == 0:
-        recommendation = "投稿"
-        journal_type = "顶级期刊（Nature子刊、Cell子刊）"
+        recommendation = "Quality-control criteria met"
+        journal_type = "Proceed with independent validation and complete methodological reporting"
         key_points = [
-            "创新的图神经网络数据增强方法",
-            "严格的统计验证和可信度评估",
-            "在神经科学数据上的优秀表现"
+            "Graph-based data augmentation with explicit structural constraints",
+            "Multiple distributional and structural diagnostic checks",
+            "Stable performance under the configured evaluation workflow"
         ]
     elif score >= 0.6 and len([i for i in issues if "严重" in i or "过小" in i]) <= 1:
-        recommendation = "投稿"
-        journal_type = "优质期刊（NeuroImage、Journal of Neuroscience）"
+        recommendation = "Quality-control criteria met"
+        journal_type = "Report sensitivity analyses and limitations alongside the primary results"
         key_points = [
-            "有效的数据增强解决方案",
-            "充分的验证和评估",
-            "在小样本神经数据上的实用价值"
+            "Data augmentation with quantitative quality diagnostics",
+            "Fold-specific validation and comparative assessment",
+            "Potential utility for small correlated neuroscience datasets"
         ]
     elif score >= 0.4:
-        recommendation = "有条件投稿"
-        journal_type = "专业期刊（Neural Networks、Neuroinformatics）"
+        recommendation = "Additional validation required"
+        journal_type = "Review model assumptions and strengthen sensitivity analyses"
         key_points = [
-            "新颖的技术方法",
-            "有一定的实用价值",
-            "需要强调技术创新点"
+            "Graph-aware augmentation framework",
+            "Potential analytical utility",
+            "Methodological limitations should be reported explicitly"
         ]
     else:
-        recommendation = "暂不建议投稿"
-        journal_type = "需要进一步改进"
+        recommendation = "Quality-control criteria not met"
+        journal_type = "Substantial methodological review and additional validation required"
         key_points = [
-            "增加样本量验证",
-            "优化模型参数",
-            "加强统计验证"
+            "Validate in additional samples or independent datasets",
+            "Review model configuration and training stability",
+            "Expand statistical and sensitivity analyses"
         ]
     
-    # 构建总结报告
+    # Build the structured assessment summary
     summary = {
         "overall_quality_score": float(score),
         "recommendation": recommendation,
@@ -1623,35 +1624,35 @@ def run_credibility_assessment(real_saline, real_meth, syn_saline, syn_meth, roi
         }
     }
     
-    # 打印评估结果
-    print(f"\n📋 可信度评估报告:")
-    print(f"   综合质量得分: {score:.3f}")
-    print(f"   投稿建议: {recommendation}")
-    print(f"   推荐期刊类型: {journal_type}")
+    # Print the assessment summary
+    print("\nQuality-control assessment:")
+    print(f"   Internal quality score: {score:.3f}")
+    print(f"   Assessment status: {recommendation}")
+    print(f"   Assessment guidance: {journal_type}")
     
     if strengths:
-        print(f"\n✅ 主要优势 ({len(strengths)}个):")
-        for i, strength in enumerate(strengths[:5], 1):  # 只显示前5个
+        print(f"\nPassed checks and favorable diagnostics ({len(strengths)}):")
+        for i, strength in enumerate(strengths[:5], 1):  # Display the first five items
             print(f"   {i}. {strength}")
         if len(strengths) > 5:
-            print(f"   ... 还有{len(strengths)-5}个优势")
+            print(f"   ... {len(strengths)-5} additional favorable diagnostics")
     
     if issues:
-        print(f"\n⚠️  需要改进的问题 ({len(issues)}个):")
+        print(f"\nLimitations or failed checks ({len(issues)}):")
         for i, issue in enumerate(issues, 1):
             print(f"   {i}. {issue}")
     
     if key_points:
-        print(f"\n🎯 投稿重点:")
+        print("\nKey reporting points:")
         for i, point in enumerate(key_points, 1):
             print(f"   {i}. {point}")
     
     return issues, strengths, summary
 
-# ========================= 主流程（train/gen/all） =========================
+# ========================= Main workflow (train/gen/all) =========================
 
 def compute_target_counts(n_s, n_m, target_total):
-    # 保证两组最终样本数完全相同
+    # Match the final sample counts across groups
     if target_total is None:
         target_total = max(n_s, n_m) * 2
     per_group = max(n_s, n_m, target_total // 2)
@@ -1690,14 +1691,14 @@ def main():
     reports = {"results": {}}
 
     if args.mode in {"train","all"}:
-        print("\n🚀 开始训练优化版 Hybrid Graph-MDWGAN...")
+        print("\nStarting Hybrid Graph-MDWGAN training...")
         best_s, scaler_s = train_group("Saline", saline_np, Ahat_np, seed=args.seed, out_dir=args.out_dir)
         best_m, scaler_m = train_group("METH",   meth_np,   Ahat_np, seed=args.seed, out_dir=args.out_dir)
         print("BEST Saline:", best_s)
         print("BEST METH:",   best_m)
 
     if args.mode in {"gen","all"}:
-        print("\n📊 生成合成数据...")
+        print("\nGenerating synthetic samples...")
         ck_s = os.path.join(args.out_dir, "Saline", f"best_seed{args.seed}.pt")
         ck_m = os.path.join(args.out_dir, "METH",   f"best_seed{args.seed}.pt")
         syn_s = generate_synthetic(ck_s, n_s_gen)
@@ -1740,13 +1741,13 @@ def main():
         overall_b = 0.5*(metrics_s_b["scores"]["total"] + metrics_m_b["scores"]["total"])
         overall_a = 0.5*(metrics_s_a["scores"]["total"] + metrics_m_a["scores"]["total"])
 
-        print(f"\n📈 质量评分:")
+        print("\nQuality metrics:")
         print(f"   Saline: BEFORE={metrics_s_b['scores']['total']:.1f} → AFTER={metrics_s_a['scores']['total']:.1f}")
         print(f"   METH:   BEFORE={metrics_m_b['scores']['total']:.1f} → AFTER={metrics_m_a['scores']['total']:.1f}")
         print(f"   Overall: BEFORE={overall_b:.1f} → AFTER={overall_a:.1f}")
 
         # 可信度评估
-        print("\n🔍 开始可信度评估...")
+        print("\nStarting quality-control assessment...")
         issues, strengths, summary = run_credibility_assessment(
             real_saline=saline_np,
             real_meth=meth_np,
@@ -1780,25 +1781,25 @@ def main():
         with open(results_path, "w", encoding="utf-8") as f:
             json.dump(results, f, ensure_ascii=False, indent=2)
         
-        # 保存增强数据
+        # Save the augmented dataset
         excel_path = os.path.join(args.out_dir, "augmented_data.xlsx")
         save_formatted_excel(saline_np, meth_np, syn_s, syn_m, feat_names, out_xlsx=excel_path)
         
-        print(f"\n📊 结果已保存:")
-        print(f"   - 评估报告: {results_path}")
-        print(f"   - 增强数据: {excel_path}")
+        print("\nSaved outputs:")
+        print(f"   - Assessment report: {results_path}")
+        print(f"   - Augmented data: {excel_path}")
         
-        # 投稿建议总结
-        print(f"\n🎯 最终投稿建议:")
-        if summary.get("recommendation") == "投稿":
-            print("   ✅ 建议投稿: 质量达标，可信度较高")
-            print("   📚 建议期刊类型: 神经科学、计算生物学、机器学习交叉领域")
-            print("   🎯 重点强调: 图神经网络在神经数据增强中的创新应用")
+        # Final quality-control summary
+        print("\nFinal quality-control summary:")
+        if summary.get("recommendation") == "Quality-control criteria met":
+            print("   Status: predefined quality-control criteria were met")
+            print("   Guidance: report all sensitivity analyses and dataset limitations")
+            print("   Reporting focus: graph-aware augmentation and fold-specific validation")
         else:
-            print("   ⚠️  暂不建议投稿: 需要进一步改进")
-            print("   🔧 主要改进方向: 增加样本量验证、优化模型参数、加强统计验证")
+            print("   Status: additional methodological review is required")
+            print("   Guidance: strengthen validation, training diagnostics, and sensitivity analyses")
 
-    print("\n✅ 程序运行完成")
+    print("\nProgram completed")
 
 if __name__ == '__main__':
     main()

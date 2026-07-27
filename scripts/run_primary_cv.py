@@ -2,11 +2,13 @@
 """
 run_primary_cv.py
 
-一区标准评估协议（避免数据泄漏）：
-Repeated Stratified K-Fold 外层CV
-fold内：扩增(Ours/ROS/SMOTE) -> 筛选(feature_selection.py：fusion/consensus/gnn) -> 固定分类器(LogReg) -> 验证fold评估
+Leakage-controlled evaluation protocol:
+Repeated stratified K-fold outer cross-validation.
+Within each training fold: augmentation (Graph-MDWGAN/ROS/SMOTE), feature ranking
+(feature_selection.py: fusion/consensus/GNN-lite), fixed-classifier fitting
+(logistic regression), and held-out validation.
 
-输出：
+Outputs:
   cv_results/auc_k_long.csv
   cv_results/auc_k_mean_sd.csv
   cv_results/jaccard_mean_sd.csv
@@ -34,12 +36,12 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import NearestNeighbors
 from typing import Dict, Union
 
-# ===== 你的代码依赖（同目录）=====
+# ===== Local project dependencies =====
 from graph_mdwgan import load_excel_data, train_group, postprocess_v10k, EPS_POS
 
 META_COLS = {"Group", "Origin", "SampleID"}
 
-# ----------------- 工具函数 -----------------
+# ----------------- Utility functions -----------------
 def set_seed(seed: int):
     import random
     random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
@@ -70,7 +72,7 @@ def dup_rates(real_np: np.ndarray, added_np: np.ndarray, decimals: int = 6):
     return float(dup_to_real), float(dup_within)
 
 def _resolve_ckpt_path(best_info, ckpt_dir: Path, group: str) -> str:
-    """尽量从 train_group 返回值或目录中找到可用 ckpt 路径。"""
+    """Resolve a usable checkpoint path from train_group output or the checkpoint directory."""
     path = None
     if isinstance(best_info, dict):
         path = best_info.get("path") or best_info.get("ckpt")
@@ -91,17 +93,17 @@ def _resolve_ckpt_path(best_info, ckpt_dir: Path, group: str) -> str:
         return str(candidates[0])
 
     raise FileNotFoundError(
-        f"无法定位 {group} 的 ckpt。train_group 返回={best_info}，ckpt_dir={ckpt_dir}"
+        f"Unable to locate a checkpoint for {group}. train_group output={best_info}, ckpt_dir={ckpt_dir}"
     )
 
-# ----------------- Ours 生成器加载与采样（复用 integrated_split_augment 的逻辑） -----------------
+# ----------------- Graph-MDWGAN generator loading and sampling -----------------
 def _load_generator_from_ckpt(ckpt_path: str, device: str):
     from graph_mdwgan import Generator
     ck = torch.load(ckpt_path, map_location=device, weights_only=False)
     cfg = ck.get("model_config", {})
     feat_dim = cfg.get("feat_dim")
     if feat_dim is None:
-        raise ValueError("ckpt 缺少 feat_dim，无法恢复生成器。")
+        raise ValueError("Checkpoint is missing feat_dim; the generator cannot be restored.")
 
     G = Generator(
         z_dim=cfg.get("z_dim", 128),
@@ -114,7 +116,7 @@ def _load_generator_from_ckpt(ckpt_path: str, device: str):
     G.load_state_dict(ck["G"])
     G.eval()
 
-    # EMA 优先
+    # Prefer exponential moving-average weights when available
     if "ema" in ck and isinstance(ck["ema"], dict):
         with torch.no_grad():
             for n, p in G.named_parameters():
@@ -130,7 +132,7 @@ def _load_generator_from_ckpt(ckpt_path: str, device: str):
 
 @torch.no_grad()
 def _generate_synthetic_before(G, Ahat, scaler_mean, scaler_scale, n_samples: int, device: str, batch_size: int = 128):
-    # 噪声维度
+    # Latent noise dimension
     if hasattr(G, "fc1") and hasattr(G.fc1, "in_features"):
         Z_DIM = G.fc1.in_features
     else:
@@ -148,7 +150,7 @@ def _generate_synthetic_before(G, Ahat, scaler_mean, scaler_scale, n_samples: in
         remain -= b
     return np.vstack(out_list) if out_list else np.zeros((0, int(scaler_mean.shape[0])), dtype=np.float32)
 
-# ----------------- ROS / SMOTE（组内扩增到 factor） -----------------
+# ----------------- ROS / SMOTE within-group augmentation -----------------
 def make_ros_groupwise(df_real: pd.DataFrame, factor: int, seed: int):
     rng = np.random.RandomState(seed)
     out = [df_real.copy()]
@@ -168,7 +170,7 @@ def smote_generate_group(X: np.ndarray, n_add: int, seed: int, k_neighbors: int 
     n = X.shape[0]
     k_eff = min(k_neighbors, n - 1)
     if k_eff < 1:
-        raise ValueError(f"SMOTE 需要每组至少 2 个样本，该组样本数={n}。")
+        raise ValueError(f"SMOTE requires at least two samples per group; observed n={n}.")
 
     rng = np.random.RandomState(seed)
     scaler = StandardScaler()
@@ -206,12 +208,12 @@ def make_smote_groupwise(df_real: pd.DataFrame, factor: int, seed: int, k_neighb
     df_all = pd.concat([df_real, df_added[df_real.columns]], ignore_index=True)
     return df_all, df_added
 
-# ----------------- 调用筛选脚本，并读取排名 -----------------
+# ----------------- Run feature ranking and load ranked outputs -----------------
 def run_feature_selection(python_exe: str, fs_script: Path, csv_path: Path, out_dir: Path,
                           seed: int, topk_viz: int, gnn_k: int, gnn_weight: float, rf_trees: int, zthr: float):
     out_dir.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
-    env["MPLBACKEND"] = "Agg"  # 防止弹窗
+    env["MPLBACKEND"] = "Agg"  # Use a non-interactive backend for reproducible batch execution
 
     cmd = [
         python_exe, str(fs_script),
@@ -251,14 +253,14 @@ def read_rankings(out_dir: Path):
         "gnn": gnn_rank
     }
 
-# ----------------- 固定分类器评估（LogReg） -----------------
+# ----------------- Fixed-classifier evaluation (logistic regression) -----------------
 def eval_logreg_auc(train_df: pd.DataFrame, val_df: pd.DataFrame, rois: list[str], seed: int):
     Xtr = train_df[rois].to_numpy(float)
     ytr = y_from_group(train_df["Group"])
     Xva = val_df[rois].to_numpy(float)
     yva = y_from_group(val_df["Group"])
 
-    # 若验证集某类缺失，AUC 无定义
+    # AUC is undefined when the validation fold contains only one class
     if len(np.unique(yva)) < 2:
         return float("nan"), float("nan")
 
@@ -278,7 +280,7 @@ def eval_logreg_auc(train_df: pd.DataFrame, val_df: pd.DataFrame, rois: list[str
     auprc = float(average_precision_score(yva, prob))
     return auc, auprc
 
-# ----------------- 稳定性：Jaccard -----------------
+# ----------------- Ranking stability: Jaccard similarity -----------------
 def jaccard(a: set, b: set):
     u = len(a | b)
     return 0.0 if u == 0 else len(a & b) / u
@@ -294,24 +296,24 @@ def pairwise_jaccard_mean_sd(list_of_sets: list[set]):
     vals = np.array(vals, float)
     return float(vals.mean()), float(vals.std(ddof=1)) if len(vals) > 1 else 0.0
 
-# ----------------- 主程序 -----------------
+# ----------------- Main program -----------------
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--excel", type=str, default="data/brain_region_cfos.xlsx")
     ap.add_argument("--sheet", type=str, default=None)
     ap.add_argument("--factor", type=int, default=8)
 
-    # CV 设置（你可以先用 repeats=3 跑通，再加大）
+    # Cross-validation settings
     ap.add_argument("--n_splits", type=int, default=5)
     ap.add_argument("--n_repeats", type=int, default=5)
     ap.add_argument("--cv_seed", type=int, default=20250829)
 
-    # 方法开关
-    ap.add_argument("--methods", type=str, default="Ours,ROS,SMOTE")  # 可写 "ROS,SMOTE" 快速跑
+    # Augmentation methods
+    ap.add_argument("--methods", type=str, default="Ours,ROS,SMOTE")  # Specify a subset such as "ROS,SMOTE" for a reduced run
     ap.add_argument("--strict_ours", action="store_true",
-                    help="严格：Ours 每个fold都重新训练生成器（一区建议开启；很耗时）")
+                    help="Retrain the Graph-MDWGAN generator independently within every outer fold. This is computationally intensive but provides the strictest leakage control.")
 
-    # feature selection 参数
+    # Feature-selection parameters
     ap.add_argument("--fs_script", type=str, default="scripts/feature_selection.py")
     ap.add_argument("--topk_viz", type=int, default=20)
     ap.add_argument("--gnn_k", type=int, default=5)
@@ -319,13 +321,13 @@ def main():
     ap.add_argument("--rf_trees", type=int, default=500)
     ap.add_argument("--zthr", type=float, default=0.0)
 
-    # SMOTE 参数
+    # SMOTE parameters
     ap.add_argument("--smote_k", type=int, default=5)
 
-    # 输出目录
+    # Output directory
     ap.add_argument("--out_dir", type=str, default="outputs/cv_results")
     ap.add_argument("--keep_fold_artifacts", action="store_true",
-                    help="保留每个fold的筛选输出（不加则只保留汇总结果）")
+                    help="Retain fold-level feature-ranking outputs in addition to summary files.")
 
     args = ap.parse_args()
 
@@ -334,17 +336,17 @@ def main():
 
     fs_script = Path(args.fs_script)
     if not fs_script.exists():
-        raise FileNotFoundError(f"找不到筛选脚本：{fs_script}（请把本脚本与 feature_selection.py 放同目录）")
+        raise FileNotFoundError(f"Feature-selection script not found: {fs_script}. Place this script and feature_selection.py in the same directory.")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     set_seed(args.cv_seed)
 
-    # 1) 读入全数据（行=样本，列=ROI）
+    # 1) Load the full dataset (rows=samples, columns=ROIs)
     Xs, Xm, roi_names = load_excel_data(args.excel, args.sheet)
     nS, nM = Xs.shape[0], Xm.shape[0]
     p = len(roi_names)
 
-    # 构造全体 DataFrame（原始样本，用于 CV 划分）
+    # Construct the full real-sample DataFrame used for outer CV splitting
     rows: list[Dict[str, Union[str, float]]] = []
     for i in range(nS):
         r: Dict[str, Union[str, float]] = {"Group": "Saline", "Origin": "RealTrain", "SampleID": f"Saline_{i+1:03d}"}
@@ -372,11 +374,11 @@ def main():
     k_list = [1, 3, 5, 10, 20]
     k_list = [k for k in k_list if k <= p]
 
-    # 记录：性能 + 稳定性所需的 topk set
+    # Store performance metrics and top-k sets for stability analysis
     auc_rows = []
     topk_sets = {}  # key=(method, scheme, k) -> list[set]
 
-    # 3) 循环每个fold
+    # 3) Iterate over outer folds
     fold_id = 0
     python_exe = sys.executable
 
@@ -389,12 +391,12 @@ def main():
         df_va = df_all.iloc[va_idx].copy()
         df_tr_real["Origin"] = "RealTrain"
 
-        # 训练fold内计算 Ahat（严格避免泄漏）
+        # Estimate Ahat from the training fold only to prevent information leakage
         X_train_all = df_tr_real[feats].to_numpy(float)
         X_train_log = np.log1p(np.clip(X_train_all, 0, None))
         Ahat_np = safe_corrcoef(X_train_log)
 
-        # 每个fold临时目录
+        # Fold-specific working directory
         fold_dir = out_dir / f"fold_{fold_id:04d}"
         tmp_dir = fold_dir / "tmp"
         tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -402,18 +404,18 @@ def main():
         for method in methods:
             method_name = method
 
-            # --------- 3.1 生成该fold的扩增训练集 ---------
+            # --------- 3.1 Generate the augmented training set for this fold ---------
             if method_name.upper() == "OURS":
-                # 严格模式：每fold重新训练生成器（一区建议）
-                # 非严格：仍然会训练，但你可以后续自行改成缓存复用
+                # Strict mode: retrain the generator independently within each fold
+                # Standard mode: training remains fold-specific; checkpoint reuse can be implemented separately if required
                 ckpt_dir = fold_dir / "ckpt_ours"
                 ckpt_dir.mkdir(parents=True, exist_ok=True)
 
-                # 分组拆分训练fold
+                # Split the training fold by experimental group
                 Xs_tr = df_tr_real[df_tr_real["Group"] == "Saline"][feats].to_numpy(float)
                 Xm_tr = df_tr_real[df_tr_real["Group"] == "METH"][feats].to_numpy(float)
 
-                # 训练生成器（强制重训保证严格）
+                # Retrain the generator to maintain fold independence
                 best_S, _ = train_group("Saline", Xs_tr, Ahat_np, seed=fold_seed, out_dir=str(ckpt_dir), force_retrain=args.strict_ours)
                 best_M, _ = train_group("METH",   Xm_tr, Ahat_np, seed=fold_seed + 1, out_dir=str(ckpt_dir), force_retrain=args.strict_ours)
 
@@ -442,7 +444,7 @@ def main():
                 df_tr_aug = pd.concat([df_tr_real, df_syn_S[df_tr_real.columns], df_syn_M[df_tr_real.columns]],
                                       ignore_index=True)
 
-                # 记录重复度（解释用）
+                # Record duplicate rates for audit and sensitivity reporting
                 dtr_S, dwi_S = dup_rates(Xs_tr, syn_S)
                 dtr_M, dwi_M = dup_rates(Xm_tr, syn_M)
                 dup_to_real = (dtr_S * len(Xs_tr) + dtr_M * len(Xm_tr)) / (len(Xs_tr) + len(Xm_tr) + 1e-12)
@@ -461,9 +463,9 @@ def main():
                 dup_to_real, dup_within = dup_rates(X_real, X_add)
 
             else:
-                raise ValueError(f"未知方法：{method_name}（methods 里只支持 Ours/ROS/SMOTE）")
+                raise ValueError(f"Unknown method: {method_name}. Supported methods are Ours, ROS, and SMOTE.")
 
-            # --------- 3.2 运行筛选脚本（只用训练fold的扩增数据）---------
+            # --------- 3.2 Run feature ranking using augmented training-fold data only ---------
             method_tag = method_name.upper()
             csv_path = tmp_dir / f"train_{method_tag}_x{args.factor}.csv"
             df_tr_aug.to_csv(csv_path, index=False, encoding="utf-8-sig")
@@ -486,7 +488,7 @@ def main():
 
             ranks = read_rankings(fs_out)
 
-            # --------- 3.3 AUC-k（在验证fold评估）---------
+            # --------- 3.3 Evaluate top-k performance on the held-out validation fold ---------
             for scheme, rank_list in ranks.items():
                 for k in k_list:
                     rois = rank_list[:k]
@@ -507,20 +509,20 @@ def main():
                     key = (method_name, scheme, k)
                     topk_sets.setdefault(key, []).append(set(rois))
 
-        # 清理中间产物（默认只保留汇总结果）
+        # Remove intermediate artifacts unless fold-level outputs are requested
         if not args.keep_fold_artifacts:
-            # 保留 fold 内必要的最小信息即可：这里直接删整个 fold_dir 的 tmp（不删筛选输出）
-            # 若你想更激进，可删除 fold_dir 里的 ckpt_ours 与 fs_*，但那会丢失可追溯性。
+            # Remove temporary files while retaining requested feature-ranking outputs
+            # Checkpoints and ranking outputs are retained when traceability is required.
             try:
                 shutil.rmtree(tmp_dir, ignore_errors=True)
             except Exception:
                 pass
 
-    # 4) 输出性能长表
+    # 4) Write the long-format performance table
     df_long = pd.DataFrame(auc_rows)
     df_long.to_csv(out_dir / "auc_k_long.csv", index=False, encoding="utf-8-sig")
 
-    # 5) 性能均值±SD
+    # 5) Summarize performance as mean and standard deviation
     df_sum = (df_long
               .groupby(["method", "scheme", "k"])
               .agg(auc_mean=("auc", "mean"), auc_sd=("auc", "std"),
@@ -530,7 +532,7 @@ def main():
               .reset_index())
     df_sum.to_csv(out_dir / "auc_k_mean_sd.csv", index=False, encoding="utf-8-sig")
 
-    # 6) 稳定性：Jaccard（跨所有fold）
+    # 6) Summarize Jaccard stability across folds
     jac_rows = []
     for (method, scheme, k), sets_list in topk_sets.items():
         jm, jsd = pairwise_jaccard_mean_sd(sets_list)
@@ -545,7 +547,7 @@ def main():
     df_jac = pd.DataFrame(jac_rows).sort_values(["method", "scheme", "k"])
     df_jac.to_csv(out_dir / "jaccard_mean_sd.csv", index=False, encoding="utf-8-sig")
 
-    # 7) 频率：Top10（如果ROI数不足则取最大k）
+    # 7) Summarize top-10 selection frequencies (or all ROIs when fewer than 10)
     k_freq = 10 if 10 in k_list else max(k_list)
     for method in sorted(set(df_long["method"].tolist())):
         for scheme in sorted(set(df_long["scheme"].tolist())):

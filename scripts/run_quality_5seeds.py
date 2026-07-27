@@ -1,7 +1,7 @@
 # run_5seeds_full_pipeline_x8.py
-# 一键跑 5 个 seed：Ours(重新划分+扩增x8) + ROSx8 + SMOTEx8，并汇总 mean±sd
-# 依赖：pandas numpy torch scikit-learn
-# 要求：repository scripts directory contains run_single_split_augmentation.py and graph_mdwgan.py
+# Run five random seeds for Graph-MDWGAN, ROS, and SMOTE at 8x augmentation and summarize mean ± SD
+# Dependencies: pandas, numpy, torch, scikit-learn
+# Required local scripts: run_single_split_augmentation.py and graph_mdwgan.py
 
 import os
 import sys
@@ -18,9 +18,9 @@ from sklearn.neighbors import NearestNeighbors
 
 from graph_mdwgan import pack_scores, sliced_wasserstein_distance
 
-# ====== 你的原始数据（已写死）======
+# ====== Default input dataset ======
 FULL_EXCEL = "data/brain_region_cfos.xlsx"
-# ====== 配置 ======
+# ====== Configuration ======
 SEEDS = [20250829, 20250830, 20250831, 20250832, 20250833]
 FACTOR = 8
 ROOT_DIR = Path("outputs/quality_5seeds")
@@ -46,9 +46,7 @@ def feat_cols(df: pd.DataFrame):
 
 
 def metrics_mmd_js_swd_no_v10k(real_np: np.ndarray, synth_np: np.ndarray, seed: int):
-    """
-    ROS/SMOTE：跳过 v10k，直接计算 log1p + pack_scores(mmd_rbf/js_avg) + SWD
-    """
+    """Compute log1p-based MMD, JS divergence, and SWD for ROS/SMOTE without v10k post-processing."""
     real_log = torch.tensor(np.log1p(np.clip(real_np, 0, None)).astype(np.float32))
     syn_log  = torch.tensor(np.log1p(np.clip(synth_np, 0, None)).astype(np.float32))
 
@@ -67,10 +65,9 @@ def metrics_mmd_js_swd_no_v10k(real_np: np.ndarray, synth_np: np.ndarray, seed: 
 
 
 def dup_rates(real_np: np.ndarray, added_np: np.ndarray, decimals: int = DUP_DECIMALS):
-    """
-    dup_to_real：新增样本中，与真实样本重复的比例
-    dup_within ：新增样本内部重复比例
-    浮点用 round(decimals) 作为容差
+    """Return duplication rates against real samples and within the added sample set.
+
+    Floating-point values are rounded to ``decimals`` places before tuple matching.
     """
     if added_np.shape[0] == 0:
         return float("nan"), float("nan")
@@ -107,7 +104,7 @@ def smote_generate_group(X: np.ndarray, n_add: int, seed: int, k: int = K_NEIGHB
     n = X.shape[0]
     k_eff = min(k, n - 1)
     if k_eff < 1:
-        raise ValueError(f"SMOTE 需要每组至少 2 个样本，但该组样本数={n}。")
+        raise ValueError(f"SMOTE requires at least two samples per group; observed n={n}.")
 
     rng = np.random.RandomState(seed)
 
@@ -149,9 +146,9 @@ def make_smote(df_real: pd.DataFrame, factor: int, seed: int):
 
 
 def weighted_metrics(df_real: pd.DataFrame, df_added: pd.DataFrame, seed: int):
-    """
-    按组计算，再按该组真实样本数加权平均
-    返回：mmd, js, swd, dup_to_real, dup_within
+    """Compute group-specific metrics and aggregate them using real-sample counts as weights.
+
+    Returns: mmd, js, swd, dup_to_real, dup_within.
     """
     feats = feat_cols(df_real)
     groups = sorted(df_real["Group"].unique())
@@ -176,9 +173,7 @@ def weighted_metrics(df_real: pd.DataFrame, df_added: pd.DataFrame, seed: int):
 
 
 def weighted_dup_for_ours(df_real: pd.DataFrame, df_syn: pd.DataFrame):
-    """
-    Ours 的重复度也按组加权（Synthetic vs RealTrain）
-    """
+    """Compute group-weighted duplication rates for Synthetic versus RealTrain samples."""
     feats = feat_cols(df_real)
     groups = sorted(df_real["Group"].unique())
     weights = []
@@ -201,7 +196,7 @@ def weighted_dup_for_ours(df_real: pd.DataFrame, df_syn: pd.DataFrame):
 def aggregate_all(root_dir: Path, out_name: str = "summary_mean_sd_x8.csv"):
     files = glob.glob(str(root_dir / "seed_*" / "compare" / "compare_x8_seed*.csv"))
     if not files:
-        raise FileNotFoundError("未找到 compare_x8_seed*.csv，请确认单 seed 跑通后再汇总。")
+        raise FileNotFoundError("No compare_x8_seed*.csv files were found. Complete the per-seed runs before aggregation.")
 
     df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
 
@@ -236,7 +231,7 @@ def main():
         for d in [ours_dir, ckpt_dir, cmp_dir, ros_dir, sm_dir]:
             d.mkdir(parents=True, exist_ok=True)
 
-        # ===== 1) 跑 Ours：每个 seed 重新划分（固定 factor=8，保证可比）=====
+        # ===== 1) Run Graph-MDWGAN with an independent split for each seed (fixed factor=8) =====
         run_cmd([
             sys.executable, "scripts/run_single_split_augmentation.py",
             "--excel", FULL_EXCEL,
@@ -250,27 +245,27 @@ def main():
         factor_met_path = ours_dir / "factor_metrics.csv"
 
         if not train_aug_path.exists():
-            raise FileNotFoundError(f"未找到 {train_aug_path}，请确认 integrated_split_augment.py 的输出文件名。")
+            raise FileNotFoundError(f"Expected augmented training file not found: {train_aug_path}. Verify the output filename from run_single_split_augmentation.py.")
         if not factor_met_path.exists():
-            raise FileNotFoundError(f"未找到 {factor_met_path}。")
+            raise FileNotFoundError(f"Expected factor-metrics file not found: {factor_met_path}.")
 
         df_aug = pd.read_csv(train_aug_path)
         if "Origin" not in df_aug.columns:
-            raise ValueError("train_augmented_x*.csv 缺少 Origin 列，无法区分 RealTrain/Synthetic。")
+            raise ValueError("train_augmented_x*.csv is missing the Origin column required to distinguish RealTrain and Synthetic samples.")
 
         df_real = df_aug[df_aug["Origin"].astype(str) == "RealTrain"].copy()
         df_syn  = df_aug[df_aug["Origin"].astype(str) == "Synthetic"].copy()
 
         if len(df_real) == 0:
-            raise ValueError("未找到 Origin=RealTrain 的样本。")
+            raise ValueError("No samples with Origin=RealTrain were found.")
         if len(df_syn) == 0:
-            raise ValueError("未找到 Origin=Synthetic 的样本。")
+            raise ValueError("No samples with Origin=Synthetic were found.")
 
-        # Ours：mmd/js/swd 从 factor_metrics.csv 读取；dup 从 Synthetic vs RealTrain 计算
+        # Graph-MDWGAN: read MMD/JS/SWD from factor_metrics.csv and calculate duplication from Synthetic versus RealTrain
         fm = pd.read_csv(factor_met_path)
         row = fm[fm["factor"] == FACTOR]
         if len(row) == 0:
-            raise ValueError(f"factor_metrics.csv 中未找到 factor={FACTOR}。")
+            raise ValueError(f"factor_metrics.csv does not contain factor={FACTOR}.")
         row = row.iloc[0]
         ours_mmd = float(row["mmd"])
         ours_js  = float(row["js"])
@@ -297,7 +292,7 @@ def main():
             "dup_to_real": sm_dtr, "dup_within": sm_dwi, "rank_sum": np.nan
         }]).to_csv(sm_dir / f"smote_factor_metrics_x{FACTOR}.csv", index=False, encoding="utf-8-sig")
 
-        # ===== 4) 三方法对比表（该 seed）=====
+        # ===== 4) Per-seed comparison across the three augmentation methods =====
         compare = pd.DataFrame([
             {"method": "Ours", "seed": s, "factor": FACTOR, "mmd": ours_mmd, "js": ours_js, "swd": ours_swd,
              "dup_to_real": ours_dtr, "dup_within": ours_dwi},
@@ -311,7 +306,7 @@ def main():
         compare.to_csv(out_cmp, index=False, encoding="utf-8-sig")
         print("Saved:", out_cmp)
 
-    # ===== 5) 汇总 5 seed：mean±sd =====
+    # ===== 5) Aggregate results across five seeds as mean ± SD =====
     aggregate_all(ROOT_DIR, out_name=f"summary_mean_sd_x{FACTOR}.csv")
 
 

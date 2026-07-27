@@ -4,19 +4,17 @@
 """
 run_single_split_augmentation.py
 
-一站式流程：
-1) 从 Excel 加载 Saline/METH 脑区数据；
-2) 固定随机划分：Saline(8 train, 3 test), METH(9 train, 4 test)；
-3) 仅用训练子集，按分组分别训练生成器（沿用 graph_mdwgan.py 的训练流程与超参，不做改动）；
-4) 对训练集尝试 2×/4×/6×/8×/10×/12× 六档扩增（分组各自扩增），计算 MMD/JS/SWD 指标；
-5) 选择最稳定的扩增倍数，导出两份数据：
-   - train_augmented_x{BEST}.csv  （训练集原始 + 扩增样本，分组标注）
-   - test_original.csv            （测试集原始样本，分组标注）
-   同时输出 factor_metrics.csv 与 splits_and_choice.json 以保证可复现。
+Single-split augmentation workflow:
+1) Load Saline and METH brain-region data from Excel.
+2) Apply a fixed stratified split: Saline (8 train, 3 test) and METH (9 train, 4 test).
+3) Train group-specific generators using the training subset only and the implementation in graph_mdwgan.py.
+4) Evaluate 2x/4x/6x/8x/10x/12x augmentation factors using MMD, JS divergence, and SWD.
+5) Select the most stable factor and export:
+   - train_augmented_x{BEST}.csv (real training samples plus synthetic samples)
+   - test_original.csv (held-out real samples)
+   - factor_metrics.csv and splits_and_choice.json for reproducibility.
 
-说明：
-- 本脚本depends on scripts/graph_mdwgan.py（不会修改其中训练超参与模型结构）；
-- 你只需运行本脚本即可完成划分、训练、评估、扩增与导出。
+This script depends on scripts/graph_mdwgan.py and does not modify its model architecture or training hyperparameters.
 """
 
 import os
@@ -28,18 +26,18 @@ import numpy as np
 import pandas as pd
 import torch
 
-# ---- 从你的主脚本导入（不改动其实现与超参） ----
+# ---- Import the reference Graph-MDWGAN implementation ----
 from graph_mdwgan import (
     load_excel_data,                # Excel -> (Xs, Xm, roi_names)
-    train_group,                    # 单组训练（内部包含早停/评估等）
-    postprocess_v10k,               # v10k 后处理
-    pack_scores,                    # 返回评估字典（含 mmd_rbf, js_avg）
-    sliced_wasserstein_distance,    # SWD 计算
+    train_group,                    # Group-specific training with internal early stopping and evaluation
+    postprocess_v10k,               # v10k post-processing
+    pack_scores,                    # Return evaluation metrics including mmd_rbf and js_avg
+    sliced_wasserstein_distance,    # Sliced Wasserstein distance
     EPS_POS
 )
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-DUP_DECIMALS = 6  # 重复度判定的四舍五入位数，可按需要改 4/5/6
+DUP_DECIMALS = 6  # Decimal precision used for duplicate-sample matching
 
 
 def set_seed(seed: int):
@@ -49,18 +47,18 @@ def set_seed(seed: int):
         torch.cuda.manual_seed_all(seed)
 
 
-# ============== 从 checkpoint 恢复生成器并采样 ==============
+# ============== Restore the generator from a checkpoint and sample ==============
 def _load_generator_from_ckpt(ckpt_path: str, device: str = DEVICE):
     """
-    从 graph_mdwgan.py 训练保存的 ckpt 恢复生成器权重（若存在EMA则优先使用EMA影子权重）。
-    返回：(G, Ahat_tensor, scaler_mean_tensor, scaler_scale_tensor, model_cfg)
+    Restore generator weights from a graph_mdwgan.py checkpoint. EMA weights are preferred when available.
+    Returns: (G, Ahat_tensor, scaler_mean_tensor, scaler_scale_tensor, model_cfg).
     """
-    from graph_mdwgan import Generator  # 使用原实现
+    from graph_mdwgan import Generator  # Use the reference implementation
     ck = torch.load(ckpt_path, map_location=device, weights_only=False)
     cfg = ck.get("model_config", {})
     feat_dim = cfg.get("feat_dim")
     if feat_dim is None:
-        raise ValueError("ckpt 缺少 feat_dim 配置，无法恢复生成器。")
+        raise ValueError("Checkpoint is missing feat_dim; the generator cannot be restored.")
 
     G = Generator(
         z_dim=cfg.get("z_dim", 128),
@@ -70,11 +68,11 @@ def _load_generator_from_ckpt(ckpt_path: str, device: str = DEVICE):
         dropout=cfg.get("dropout", 0.0)
     ).to(device)
 
-    # 载入训练时的权重
+    # Load trained generator weights
     G.load_state_dict(ck["G"])
     G.eval()
 
-    # 若有 EMA，使用 EMA 替换参数（确保推理稳定性）
+    # Replace parameters with EMA weights when available for stable inference
     if "ema" in ck and isinstance(ck["ema"], dict):
         with torch.no_grad():
             for n, p in G.named_parameters():
@@ -83,7 +81,7 @@ def _load_generator_from_ckpt(ckpt_path: str, device: str = DEVICE):
                     tensor = torch.tensor(arr, device=device, dtype=p.dtype)
                     p.data.copy_(tensor)
 
-    # Ahat / scaler
+    # Graph adjacency and scaling parameters
     Ahat = torch.tensor(ck["Ahat"], device=device, dtype=torch.float32)
     scaler_mean = torch.tensor(ck["scaler_mean"], device=device, dtype=torch.float32)
     scaler_scale = torch.tensor(ck["scaler_scale"], device=device, dtype=torch.float32)
@@ -93,14 +91,14 @@ def _load_generator_from_ckpt(ckpt_path: str, device: str = DEVICE):
 @torch.no_grad()
 def _generate_synthetic(G, Ahat, scaler_mean, scaler_scale, n_samples: int, batch_size: int = 128, device: str = DEVICE):
     """
-    使用训练好的生成器生成 n_samples 个样本（返回 BEFORE 域的 numpy 数组）。
-    流程：标准化log域 -> 还原log域 -> expm1 得到原始计数域（不含v10k后处理）。
+    Generate n_samples observations with the trained generator and return values in the pre-v10k domain.
+    Workflow: standardized log domain -> inverse scaling -> expm1 to the original count domain.
     """
-    # 读取噪声维度
+    # Infer the latent noise dimension
     if hasattr(G, "fc1") and hasattr(G.fc1, "in_features"):
         Z_DIM = G.fc1.in_features
     else:
-        Z_DIM = 128  # 兜底
+        Z_DIM = 128  # Fallback for checkpoints without an explicit input dimension
 
     out_list = []
     remain = int(n_samples)
@@ -125,7 +123,7 @@ def _metrics_mmd_js_swd(real_np: np.ndarray, synth_np: np.ndarray, decimals: int
     - dup_to_real：合成样本中与真实样本重复的比例（按 round(decimals) 判断）
     - dup_within：合成样本内部重复比例（按 round(decimals) 判断）
     """
-    # v10k 后处理
+    # v10k post-processing
     fk_after_np = postprocess_v10k(real_np, synth_np, final_export=False)
 
     # ===== 重复度（在 v10k 后处理之后计算，保证口径一致）=====
@@ -223,7 +221,7 @@ def main():
     ap.add_argument("--sheet", type=str, default=None, help="Excel 工作表名（可选）")
     ap.add_argument("--seed", type=int, default=20250829)
 
-    # 划分数量（按你的要求）
+    # Fixed group-specific train/test counts
     ap.add_argument("--saline_train", type=int, default=8)
     ap.add_argument("--saline_test",  type=int, default=3)
     ap.add_argument("--meth_train",   type=int, default=9)
@@ -333,33 +331,33 @@ def main():
               f"dupR={met_S['dup_to_real']:.4f}, dupA={met_S['dup_within']:.4f}")
         print(f"METH  : MMD={met_M['mmd']:.6f}, JS={met_M['js']:.6f}, SWD={met_M['swd']:.6f}, "
               f"dupR={met_M['dup_to_real']:.4f}, dupA={met_M['dup_within']:.4f}")
-        print(f"[加权汇总] MMD={agg['mmd']:.6f}, JS={agg['js']:.6f}, SWD={agg['swd']:.6f}, "
+        print(f"[Weighted summary] MMD={agg['mmd']:.6f}, JS={agg['js']:.6f}, SWD={agg['swd']:.6f}, "
               f"dupR={agg['dup_to_real']:.4f}, dupA={agg['dup_within']:.4f}")
 
     best_factor, rank_scores = _rank_select(results)
-    print("\\n=== 倍数选择结果 ===")
+    print("\\n=== Augmentation-factor selection ===")
     for f in factors:
-        print(f"×{f}: rank_sum={rank_scores[f]:.2f}  (MMD={results[f]['mmd']:.6f}, JS={results[f]['js']:.6f}, SWD={results[f]['swd']:.6f})")
-    print(f"\\n✅ 最稳定倍数：×{best_factor}")
+        print(f"x{f}: rank_sum={rank_scores[f]:.2f}  (MMD={results[f]['mmd']:.6f}, JS={results[f]['js']:.6f}, SWD={results[f]['swd']:.6f})")
+    print(f"\\nSelected augmentation factor: x{best_factor}")
 
-    # 保存指标对比
+    # Save factor-comparison metrics
     df_metrics = pd.DataFrame(
         [{"factor": f, **results[f], "rank_sum": rank_scores[f]} for f in factors]
     ).sort_values("factor")
     df_metrics.to_csv(os.path.join(args.out_dir, "factor_metrics.csv"), index=False)
 
-    # 5) 产出两份数据
+    # 5) Export augmented training data and held-out test data
     synth_best_S = synth_cache[best_factor]["Saline"]
     synth_best_M = synth_cache[best_factor]["METH"]
 
-    # 训练集：原始训练 + 选中倍数合成（分组扩增）
+    # Training set: real training samples plus group-specific synthetic samples
     train_rows = []
     train_rows += _make_rows("Saline", Xs_train, roi_names, "RealTrain")
     train_rows += _make_rows("METH",   Xm_train, roi_names, "RealTrain")
     train_rows += _make_rows("Saline", synth_best_S, roi_names, "Synthetic")
     train_rows += _make_rows("METH",   synth_best_M, roi_names, "Synthetic")
 
-    # 测试集：仅原始
+    # Test set: held-out real samples only
     test_rows = []
     test_rows += _make_rows("Saline", Xs_test, roi_names, "RealTest")
     test_rows += _make_rows("METH",   Xm_test, roi_names, "RealTest")
@@ -372,7 +370,7 @@ def main():
     df_train.to_csv(out_train_csv, index=False)
     df_test.to_csv(out_test_csv, index=False)
 
-    # 可选导出 Excel 版
+    # Optional Excel export
     if args.export_excel:
         out_train_xlsx = os.path.join(args.out_dir, f"train_augmented_x{best_factor}.xlsx")
         out_test_xlsx  = os.path.join(args.out_dir, "test_original.xlsx")
@@ -381,7 +379,7 @@ def main():
         with pd.ExcelWriter(out_test_xlsx, engine="xlsxwriter") as writer:
             df_test.to_excel(writer, sheet_name="test", index=False)
 
-    # 保存划分与选择记录
+    # Save split indices and factor-selection metadata
     split_rec = {
         "seed": args.seed,
         "roi_names": list(map(str, roi_names)),
@@ -393,14 +391,14 @@ def main():
     with open(os.path.join(args.out_dir, "splits_and_choice.json"), "w", encoding="utf-8") as f:
         json.dump(split_rec, f, ensure_ascii=False, indent=2)
 
-    print("\\n🎉 已生成：")
+    print("\\nGenerated outputs:")
     print(f"  - {out_train_csv}")
     print(f"  - {out_test_csv}")
     print(f"  - {os.path.join(args.out_dir, 'factor_metrics.csv')}")
     print(f"  - {os.path.join(args.out_dir, 'splits_and_choice.json')}")
     if args.export_excel:
-        print("  - 以及对应的 .xlsx 文件")
-    print("说明：仅扩增训练集；扩增分 Saline/METH 两组分别进行；训练超参与主脚本一致。")
+        print("  - Corresponding .xlsx files")
+    print("Note: augmentation is restricted to the training set and performed separately for Saline and METH using the reference training configuration.")
 
 
 if __name__ == "__main__":

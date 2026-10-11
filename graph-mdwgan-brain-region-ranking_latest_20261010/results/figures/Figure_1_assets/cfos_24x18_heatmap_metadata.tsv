@@ -1,0 +1,8 @@
+	value
+source_file	D:\桌面\论文版本\graph-mdwgan-brain-region-ranking_latest_20261010\data\brain_region_cfos_with_paradigm.csv
+source_sheet	Fig1d and Fig1e reconstruction
+n_samples	24
+n_regions	18
+saline_n	11
+meth_n	13
+standardization	per-region z-score across all 24 animals; sample SD (ddof=1)

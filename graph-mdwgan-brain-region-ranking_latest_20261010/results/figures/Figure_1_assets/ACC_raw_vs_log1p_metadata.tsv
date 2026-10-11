@@ -1,0 +1,10 @@
+	value
+source_file	D:\桌面\论文版本\graph-mdwgan-brain-region-ranking_latest_20261010\data\brain_region_cfos_with_paradigm.csv
+source_sheet	Fig1d and Fig1e reconstruction
+brain_region	ACC
+n_samples	24
+saline_n	11
+meth_n	13
+transformation	natural logarithm log(1+x), numpy.log1p
+raw_median	90.536215
+log1p_median	4.515350973174313

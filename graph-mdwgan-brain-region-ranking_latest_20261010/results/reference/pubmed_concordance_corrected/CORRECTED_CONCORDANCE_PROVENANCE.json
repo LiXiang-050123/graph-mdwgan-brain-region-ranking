@@ -1,0 +1,5 @@
+{
+  "literature_snapshot": "D:\\桌面\\论文版本 - 副本 - 副本\\pubmed_concordance_output",
+  "corrected_ml_ranking": "D:\\桌面\\论文版本 - 副本 - 副本\\onezone_corrected_results_20261010\\freq_top10_factor8_Ours_consensus_raw.csv",
+  "note": "Literature records were held fixed; only the corrected ML ranking and concordance were recomputed."
+}

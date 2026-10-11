@@ -1,0 +1,5 @@
+{
+  "literature_snapshot": "D:\\桌面\\论文版本\\graph-mdwgan-brain-region-ranking_latest_20261010\\results\\reference\\pubmed_source_snapshot",
+  "corrected_ml_ranking": "D:\\桌面\\论文版本\\graph-mdwgan-brain-region-ranking_latest_20261010\\results\\reference\\corrected_secondary\\freq_top10_factor8_Ours_consensus_raw.csv",
+  "note": "Literature records were held fixed; only the corrected ML ranking and concordance were recomputed."
+}

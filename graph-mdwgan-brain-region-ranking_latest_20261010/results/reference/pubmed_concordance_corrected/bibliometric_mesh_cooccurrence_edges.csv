@@ -1,0 +1,201 @@
+﻿source,target,shared_records
+Central Nervous System Stimulants,Methamphetamine,202
+Methamphetamine,Nucleus Accumbens,146
+Dopamine,Methamphetamine,100
+Amphetamine-Related Disorders,Methamphetamine,95
+Brain,Methamphetamine,91
+Methamphetamine,Ventral Tegmental Area,74
+Methamphetamine,Prefrontal Cortex,72
+Central Nervous System Stimulants,Nucleus Accumbens,72
+Methamphetamine,Self Administration,67
+Methamphetamine,Neurons,66
+Methamphetamine,"Mice, Inbred C57BL",66
+Dopamine,Nucleus Accumbens,59
+"Behavior, Animal",Methamphetamine,55
+Corpus Striatum,Methamphetamine,53
+Methamphetamine,Motor Activity,51
+Magnetic Resonance Imaging,Methamphetamine,50
+Methamphetamine,Reward,46
+Amphetamine-Related Disorders,Central Nervous System Stimulants,46
+Brain,Central Nervous System Stimulants,44
+Drug-Seeking Behavior,Methamphetamine,44
+Methamphetamine,Proto-Oncogene Proteins c-fos,42
+Central Nervous System Stimulants,Ventral Tegmental Area,40
+Central Nervous System Stimulants,Dopamine,40
+Central Nervous System Stimulants,Prefrontal Cortex,39
+"Disease Models, Animal",Methamphetamine,37
+Central Nervous System Stimulants,Self Administration,37
+Nucleus Accumbens,Self Administration,35
+"Behavior, Animal",Central Nervous System Stimulants,34
+Amphetamine-Related Disorders,Magnetic Resonance Imaging,33
+"Conditioning, Operant",Methamphetamine,33
+Methamphetamine,Neural Pathways,32
+Immunohistochemistry,Methamphetamine,32
+Central Nervous System Stimulants,Neurons,32
+Nucleus Accumbens,Ventral Tegmental Area,32
+Central Nervous System Stimulants,"Mice, Inbred C57BL",32
+Dopamine,Ventral Tegmental Area,31
+Methamphetamine,Substance-Related Disorders,30
+Drug-Seeking Behavior,Self Administration,30
+Methamphetamine,Substance Withdrawal Syndrome,29
+Dopamine,Neurons,29
+"Extinction, Psychological",Methamphetamine,29
+Nucleus Accumbens,Prefrontal Cortex,28
+Gyrus Cinguli,Methamphetamine,26
+Methamphetamine,"Receptors, Dopamine D2",25
+Analysis of Variance,Methamphetamine,25
+Central Nervous System Stimulants,"Conditioning, Operant",25
+"Mice, Inbred C57BL",Nucleus Accumbens,25
+Central Nervous System Stimulants,Drug-Seeking Behavior,25
+Motor Activity,Nucleus Accumbens,24
+Central Nervous System Stimulants,Proto-Oncogene Proteins c-fos,24
+Amphetamine-Related Disorders,Brain,24
+Central Nervous System Stimulants,Motor Activity,24
+Methamphetamine,Substantia Nigra,23
+Cocaine,Methamphetamine,23
+Brain,Magnetic Resonance Imaging,23
+Dopamine,Motor Activity,22
+"Behavior, Animal",Nucleus Accumbens,22
+Nucleus Accumbens,Reward,22
+Central Nervous System Stimulants,"Disease Models, Animal",22
+Amphetamine-Related Disorders,Prefrontal Cortex,22
+Corpus Striatum,Dopamine,21
+Central Nervous System Stimulants,Corpus Striatum,21
+Amphetamine-Related Disorders,Nucleus Accumbens,21
+"Mice, Inbred C57BL",Ventral Tegmental Area,21
+Central Nervous System Stimulants,Reward,20
+Neurons,Nucleus Accumbens,20
+Central Nervous System Stimulants,Magnetic Resonance Imaging,20
+"Conditioning, Operant",Nucleus Accumbens,20
+Corpus Striatum,Nucleus Accumbens,19
+"Mice, Inbred C57BL",Neurons,19
+Drug-Seeking Behavior,Nucleus Accumbens,19
+"Conditioning, Operant","Extinction, Psychological",19
+"Behavior, Animal",Brain,18
+Neurons,Ventral Tegmental Area,18
+Central Nervous System Stimulants,Immunohistochemistry,18
+Analysis of Variance,Central Nervous System Stimulants,18
+Brain,Nucleus Accumbens,17
+"Behavior, Animal",Motor Activity,17
+Central Nervous System Stimulants,Neural Pathways,17
+"Conditioning, Operant",Drug-Seeking Behavior,17
+Central Nervous System Stimulants,"Extinction, Psychological",17
+Immunohistochemistry,Proto-Oncogene Proteins c-fos,16
+Amphetamine-Related Disorders,Gyrus Cinguli,16
+Dopamine,"Mice, Inbred C57BL",16
+Drug-Seeking Behavior,"Extinction, Psychological",16
+Brain,Dopamine,15
+Neural Pathways,Nucleus Accumbens,15
+Nucleus Accumbens,Proto-Oncogene Proteins c-fos,15
+Amphetamine-Related Disorders,Substance Withdrawal Syndrome,15
+Amphetamine-Related Disorders,Self Administration,15
+"Extinction, Psychological",Nucleus Accumbens,15
+"Behavior, Animal",Dopamine,14
+Brain,Substance-Related Disorders,14
+Dopamine,"Receptors, Dopamine D2",14
+"Behavior, Animal",Prefrontal Cortex,14
+Prefrontal Cortex,Ventral Tegmental Area,14
+Corpus Striatum,Prefrontal Cortex,14
+Central Nervous System Stimulants,Substance-Related Disorders,14
+"Disease Models, Animal",Nucleus Accumbens,14
+"Conditioning, Operant",Self Administration,14
+"Extinction, Psychological",Self Administration,14
+Dopamine,Substantia Nigra,13
+Amphetamine-Related Disorders,Dopamine,13
+Corpus Striatum,Neurons,13
+Magnetic Resonance Imaging,Prefrontal Cortex,13
+"Behavior, Animal","Disease Models, Animal",13
+Amphetamine-Related Disorders,"Disease Models, Animal",13
+Amphetamine-Related Disorders,Drug-Seeking Behavior,13
+"Disease Models, Animal",Self Administration,13
+Corpus Striatum,Substantia Nigra,12
+Cocaine,Nucleus Accumbens,12
+Neurons,Proto-Oncogene Proteins c-fos,12
+"Mice, Inbred C57BL",Prefrontal Cortex,12
+Gyrus Cinguli,Magnetic Resonance Imaging,12
+Reward,Ventral Tegmental Area,12
+Drug-Seeking Behavior,Ventral Tegmental Area,12
+Neurons,Prefrontal Cortex,11
+"Behavior, Animal",Ventral Tegmental Area,11
+Central Nervous System Stimulants,Gyrus Cinguli,11
+Self Administration,Ventral Tegmental Area,11
+"Disease Models, Animal",Prefrontal Cortex,11
+Amphetamine-Related Disorders,Reward,11
+Drug-Seeking Behavior,Prefrontal Cortex,11
+"Mice, Inbred C57BL",Reward,11
+Dopamine,Neural Pathways,10
+Dopamine,Immunohistochemistry,10
+Central Nervous System Stimulants,"Receptors, Dopamine D2",10
+Central Nervous System Stimulants,Cocaine,10
+Brain,Self Administration,10
+Dopamine,Self Administration,10
+Neurons,"Receptors, Dopamine D2",10
+Brain,Prefrontal Cortex,10
+Amphetamine-Related Disorders,Neurons,10
+Neural Pathways,Neurons,10
+Neural Pathways,Prefrontal Cortex,10
+"Mice, Inbred C57BL",Proto-Oncogene Proteins c-fos,10
+Prefrontal Cortex,Substance-Related Disorders,10
+"Behavior, Animal",Self Administration,10
+Amphetamine-Related Disorders,"Behavior, Animal",10
+Dopamine,Prefrontal Cortex,10
+Central Nervous System Stimulants,Substance Withdrawal Syndrome,10
+Neurons,Reward,10
+Prefrontal Cortex,Self Administration,10
+Drug-Seeking Behavior,Neurons,10
+Brain,"Disease Models, Animal",9
+"Disease Models, Animal",Motor Activity,9
+Cocaine,Dopamine,9
+Substantia Nigra,Ventral Tegmental Area,9
+Immunohistochemistry,Nucleus Accumbens,9
+Central Nervous System Stimulants,Substantia Nigra,9
+Neural Pathways,Ventral Tegmental Area,9
+Prefrontal Cortex,Proto-Oncogene Proteins c-fos,9
+"Behavior, Animal","Mice, Inbred C57BL",9
+Magnetic Resonance Imaging,Substance-Related Disorders,9
+"Mice, Inbred C57BL",Motor Activity,9
+Brain,Substance Withdrawal Syndrome,9
+Motor Activity,Ventral Tegmental Area,9
+"Disease Models, Animal",Neurons,9
+Brain,Neurons,9
+Drug-Seeking Behavior,Reward,9
+"Extinction, Psychological",Prefrontal Cortex,9
+Brain,"Mice, Inbred C57BL",9
+"Disease Models, Animal",Drug-Seeking Behavior,9
+Brain,Motor Activity,8
+Brain,Gyrus Cinguli,8
+Nucleus Accumbens,"Receptors, Dopamine D2",8
+Dopamine,Reward,8
+Amphetamine-Related Disorders,Proto-Oncogene Proteins c-fos,8
+Nucleus Accumbens,Substance Withdrawal Syndrome,8
+"Behavior, Animal",Corpus Striatum,8
+Self Administration,Substance Withdrawal Syndrome,8
+Motor Activity,Neural Pathways,8
+Magnetic Resonance Imaging,Substance Withdrawal Syndrome,8
+Corpus Striatum,"Disease Models, Animal",8
+Analysis of Variance,"Behavior, Animal",8
+Analysis of Variance,Nucleus Accumbens,8
+"Conditioning, Operant",Ventral Tegmental Area,8
+Amphetamine-Related Disorders,Corpus Striatum,8
+Nucleus Accumbens,Substance-Related Disorders,8
+"Disease Models, Animal",Dopamine,8
+Proto-Oncogene Proteins c-fos,Self Administration,8
+Prefrontal Cortex,Reward,8
+Reward,Self Administration,8
+Neurons,Self Administration,8
+Amphetamine-Related Disorders,"Mice, Inbred C57BL",8
+Brain,Corpus Striatum,7
+Neural Pathways,Substantia Nigra,7
+Brain,Cocaine,7
+"Disease Models, Animal",Substance-Related Disorders,7
+Corpus Striatum,"Receptors, Dopamine D2",7
+Brain,Proto-Oncogene Proteins c-fos,7
+Brain,Ventral Tegmental Area,7
+Amphetamine-Related Disorders,Ventral Tegmental Area,7
+Motor Activity,Prefrontal Cortex,7
+Analysis of Variance,Brain,7
+Immunohistochemistry,Neurons,7
+"Behavior, Animal",Immunohistochemistry,7
+"Behavior, Animal",Proto-Oncogene Proteins c-fos,7
+Gyrus Cinguli,Prefrontal Cortex,7
+"Behavior, Animal",Neurons,7

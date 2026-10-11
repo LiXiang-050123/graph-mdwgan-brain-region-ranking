@@ -1,0 +1,12 @@
+﻿Metric,Value
+Samples_used,152
+Features,18
+Use_origin,Both
+z_thr,0.0
+rf_trees,500
+lasso_C,1.0
+with_lasso_cv,False
+gnn_k,5
+gnn_weight,0.16666666666666666
+perm_metric,roc_auc
+perm_repeats,50

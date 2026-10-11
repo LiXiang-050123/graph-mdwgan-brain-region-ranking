@@ -1,0 +1,41 @@
+{
+  "created": "2026-10-10",
+  "fix": "Five-method consensus (ANOVA, MI, LASSO, RF, RFE) with GNN-lite fused exactly once",
+  "fair_modes": [
+    "raw"
+  ],
+  "outer_folds": 25,
+  "bootstrap_per_fold": 50,
+  "factor_method_combinations": [
+    [
+      2,
+      "Ours"
+    ],
+    [
+      4,
+      "Ours"
+    ],
+    [
+      8,
+      "Ours"
+    ],
+    [
+      8,
+      "ROS"
+    ],
+    [
+      8,
+      "RealOnly"
+    ],
+    [
+      8,
+      "SMOTE"
+    ]
+  ],
+  "perf_long_rows": 6750,
+  "stability_long_rows": 2250,
+  "source_directories": [
+    "D:\\桌面\\论文版本 - 副本 - 副本\\onezone_corrected_results_20261010_ours",
+    "D:\\桌面\\论文版本 - 副本 - 副本\\onezone_corrected_results_20261010_baselines"
+  ]
+}

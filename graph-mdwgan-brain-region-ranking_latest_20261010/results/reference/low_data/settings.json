@@ -1,0 +1,25 @@
+{
+  "base_dir": "/root/五折验证",
+  "reuse_cv_dir": "cv_results",
+  "excel": "",
+  "sheet": null,
+  "out_dir": "oneclick_lowdata_results_fast",
+  "methods": "Ours,ROS,SMOTE",
+  "k_list": "10",
+  "clfs": "logreg,svm,rf",
+  "factor": 8,
+  "min_per_class": 2,
+  "fracs": "0.2,0.4,0.6,0.8,1.0",
+  "rf_trees": 600,
+  "do_quick": 1,
+  "excel_path_resolved": "/root/五折验证/脑区_填充后.xlsx",
+  "reuse_cv_dir_resolved": "/root/五折验证/cv_results",
+  "rf_trees_effective": 300,
+  "fracs_effective": [
+    0.2,
+    0.4,
+    0.6,
+    0.8,
+    1.0
+  ]
+}

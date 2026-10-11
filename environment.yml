@@ -1,0 +1,20 @@
+name: meth-brain-region-prioritization
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - scipy
+  - scikit-learn
+  - matplotlib
+  - pillow
+  - openpyxl
+  - xlsxwriter
+  - tqdm
+  - pip
+  - pip:
+      - torch
+      - shap

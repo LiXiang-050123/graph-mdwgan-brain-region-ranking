@@ -1,0 +1,16 @@
+﻿BrainRegion,freq,freq_rate
+CLA,25,1.0
+ACC,25,1.0
+VTA,25,1.0
+NAco,25,1.0
+DMS,24,0.96
+CeA,24,0.96
+PL,23,0.92
+BLA,23,0.92
+VP,18,0.72
+OFC,13,0.52
+NAsh,10,0.4
+GP,8,0.32
+RSC,4,0.16
+CM,2,0.08
+MS,1,0.04

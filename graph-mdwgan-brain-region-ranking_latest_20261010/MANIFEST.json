@@ -1,0 +1,25 @@
+﻿{
+    "repository":  "graph-mdwgan-brain-region-ranking",
+    "release_date":  "2026-10-10",
+    "correction":  "Five-method consensus with GNN-lite fused exactly once",
+    "data_matrix":  "24 animals x 18 brain regions",
+    "file_count":  1119,
+    "total_bytes":  195930490,
+    "current_reference":  "results/reference/corrected_secondary",
+    "current_figures":  "results/figures",
+    "verification_outputs":  "results/verification",
+    "entry_points":  [
+                         "scripts/reconstruct_analysis_matrix.py",
+                         "scripts/run_primary_cv.py",
+                         "scripts/run_extended_resampling.py",
+                         "scripts/run_baseline_sensitivity.py",
+                         "scripts/recompute_corrected_concordance.py",
+                         "scripts/figures/run_all_figures.py"
+                     ],
+    "documentation":  [
+                          "README.md",
+                          "CODE_MAP.md",
+                          "MANUSCRIPT_FIGURE_MAP.md",
+                          "REPRODUCIBILITY_STATUS.md"
+                      ]
+}
